@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PredictLens — AI Prediction & Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a1a;
+    --ink-light: #555;
+    --ink-faint: #999;
+    --surface: #faf9f6;
+    --surface-alt: #f2f0eb;
+    --surface-card: #ffffff;
+    --border: #e0ddd6;
+    --border-strong: #c5c1b8;
+    --accent: #2d6a4f;
+    --accent-light: #e8f4ef;
+    --accent-muted: #52b788;
+    --warn: #b5470b;
+    --warn-light: #fdf0e8;
+    --blue: #1a4a7a;
+    --blue-light: #e8eef7;
+    --red: #9b1c1c;
+    --red-light: #fef2f2;
+    --gold: #92400e;
+    --gold-light: #fefce8;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--surface);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  header {
+    background: var(--ink);
+    color: white;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent-muted); }
+  .header-tag {
+    font-size: 11px;
+    font-weight: 400;
+    color: #aaa;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .left-col { display: flex; flex-direction: column; gap: 1rem; }
+
+  .panel {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .icon-green { background: var(--accent-light); }
+  .icon-blue { background: var(--blue-light); }
+  .icon-gold { background: var(--gold-light); }
+  .icon-red { background: var(--red-light); }
+  .panel-title { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .panel-body { padding: 1.25rem; }
+
+  .api-key-section {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 1rem;
+  }
+  .api-key-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .api-key-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--ink);
+  }
+  .api-key-input:focus { outline: none; border-color: var(--accent); }
+  .api-key-input::placeholder { color: var(--ink-faint); font-family: 'DM Sans', sans-serif; }
+  .demo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    padding: 2px 8px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 10px;
+    font-weight: 500;
+    margin-left: auto;
+  }
+  .api-status {
+    font-size: 11px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .status-dot.error { background: var(--red); }
+  .status-dot.demo { background: var(--gold); }
+
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    resize: vertical;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { outline: none; border-color: var(--border-strong); background: white; }
+  textarea::placeholder { color: var(--ink-faint); font-family: 'DM Sans', sans-serif; font-size: 13px; }
+
+  .goal-wrap { margin-top: 1rem; }
+  .goal-label { font-size: 12px; font-weight: 500; color: var(--ink-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--border-strong); background: white; }
+  input::placeholder { color: var(--ink-faint); }
+
+  .prediction-type-section { margin-top: 1rem; }
+  .prediction-type-label { font-size: 12px; font-weight: 500; color: var(--ink-light); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .prediction-types { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pred-type {
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--ink-light);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.12s;
+  }
+  .pred-type:hover { border-color: var(--accent); color: var(--accent); }
+  .pred-type.active { background: var(--ink); border-color: var(--ink); color: white; }
+
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 1rem 0; }
+  .mode-btn {
+    padding: 10px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-light);
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .mode-btn:hover { background: white; border-color: var(--border-strong); color: var(--ink); }
+  .mode-btn.active { background: var(--ink); border-color: var(--ink); color: white; }
+  .mode-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+
+  .presets-label { font-size: 11px; color: var(--ink-faint); margin-bottom: 6px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+  .preset {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--ink-light);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.12s;
+  }
+  .preset:hover { border-color: var(--accent); color: var(--accent); }
+
+  .analyze-btn {
+    width: 100%;
+    padding: 13px;
+    margin-top: 1rem;
+    background: var(--ink);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .analyze-btn:hover { background: #2c2c2c; }
+  .analyze-btn:active { transform: scale(0.99); }
+  .analyze-btn:disabled { background: #aaa; cursor: not-allowed; transform: none; }
+
+  .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .loading-state {
+    display: none;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .loading-state.visible { display: block; }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--ink);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-state p { font-size: 14px; color: var(--ink-light); }
+  .loading-state .dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0%  { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+  }
+
+  .result-block {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.3s ease forwards;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .result-block-header {
+    padding: 0.8rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .result-block-title { font-size: 13px; font-weight: 500; color: var(--ink); display: flex; align-items: center; gap: 7px; }
+  .result-block-body { padding: 1.25rem; }
+
+  .prediction-main {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.4;
+    margin-bottom: 1rem;
+  }
+
+  .prob-section { margin: 1rem 0; }
+  .prob-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .prob-label-txt { font-size: 13px; color: var(--ink-light); }
+  .prob-val { font-size: 18px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--ink); }
+  .prob-track { height: 8px; background: var(--surface-alt); border-radius: 4px; overflow: hidden; }
+  .prob-fill { height: 100%; border-radius: 4px; background: var(--accent-muted); transition: width 0.9s cubic-bezier(.4,0,.2,1); width: 0; }
+
+  .scenarios-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 1rem; }
+  .scenario {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .scenario-tag { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 5px; }
+  .scenario-text { font-size: 12px; color: var(--ink-light); line-height: 1.5; }
+  .sc-best { background: var(--accent-light); border-color: #b7dfc9; }
+  .sc-best .scenario-tag { color: var(--accent); }
+  .sc-likely { background: var(--blue-light); border-color: #bcd0e8; }
+  .sc-likely .scenario-tag { color: var(--blue); }
+  .sc-worst { background: var(--red-light); border-color: #fec9c9; }
+  .sc-worst .scenario-tag { color: var(--red); }
+
+  .sentiment-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sentiment-name { font-size: 12px; width: 70px; color: var(--ink-light); flex-shrink: 0; }
+  .bar-track { flex: 1; height: 7px; background: var(--surface-alt); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(.4,0,.2,1); width: 0; }
+  .bar-pct { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--ink); width: 32px; text-align: right; flex-shrink: 0; }
+  .sentiment-verdict {
+    margin-top: 1rem;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .verdict-pos { background: var(--accent-light); color: var(--accent); }
+  .verdict-neg { background: var(--red-light); color: var(--red); }
+  .verdict-neu { background: var(--surface-alt); color: var(--ink-light); }
+
+  .themes-list { display: flex; flex-wrap: wrap; gap: 7px; }
+  .theme-chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--ink-light);
+  }
+  .theme-chip.main { background: var(--ink); color: white; border-color: var(--ink); }
+
+  .insight-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .insight-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .insight-num { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-alt); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--ink-light); flex-shrink: 0; margin-top: 1px; }
+  .insight-text { font-size: 13px; color: var(--ink); line-height: 1.6; }
+
+  .summary-text {
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--ink);
+    white-space: pre-wrap;
+  }
+
+  .conf-badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+  .conf-high { background: var(--accent-light); color: var(--accent); }
+  .conf-med { background: var(--gold-light); color: var(--gold); }
+  .conf-low { background: var(--red-light); color: var(--red); }
+
+  .factors-list { display: flex; flex-direction: column; gap: 8px; }
+  .factor-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface-alt); border-radius: var(--radius-sm); }
+  .factor-impact { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .factor-impact.high { background: var(--accent-light); color: var(--accent); }
+  .factor-impact.med { background: var(--gold-light); color: var(--gold); }
+  .factor-impact.low { background: var(--blue-light); color: var(--blue); }
+  .factor-text { font-size: 13px; color: var(--ink); }
+
+  .timeline { position: relative; padding-left: 20px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 16px; }
+  .timeline-item:last-child { margin-bottom: 0; }
+  .timeline-dot { position: absolute; left: -17px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid white; }
+  .timeline-dot.warning { background: var(--gold); }
+  .timeline-dot.negative { background: var(--red); }
+  .timeline-time { font-size: 11px; color: var(--ink-faint); margin-bottom: 2px; }
+  .timeline-text { font-size: 13px; color: var(--ink); }
+
+  .risk-meter { display: flex; align-items: center; gap: 12px; margin: 1rem 0; }
+  .risk-track { flex: 1; height: 10px; background: linear-gradient(to right, var(--accent), var(--gold), var(--red)); border-radius: 5px; position: relative; }
+  .risk-indicator { position: absolute; top: -4px; width: 18px; height: 18px; background: white; border: 3px solid var(--ink); border-radius: 50%; transition: left 0.8s cubic-bezier(.4,0,.2,1); }
+  .risk-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-faint); margin-top: 4px; }
+
+  .wc { font-size: 11px; color: var(--ink-faint); margin-top: 6px; text-align: right; }
+
+  .empty-state {
+    background: var(--surface-card);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+    color: var(--ink-faint);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 1rem; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+  .empty-state strong { color: var(--ink-light); font-weight: 500; }
+
+  .error-box { display: none; background: var(--red-light); border: 1px solid #fec9c9; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--red); margin-top: 10px; }
+  .error-box.visible { display: block; }
+
+  .tips-box { background: var(--blue-light); border: 1px solid #bcd0e8; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--blue); margin-top: 1rem; }
+  .tips-box strong { font-weight: 500; }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; }
+    .scenarios-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Predict<span>Lens</span></div>
+  <div class="header-tag">AI Prediction Engine</div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT: INPUT PANEL -->
+  <div class="left-col">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon icon-blue">🔑</div>
+        <div class="panel-title">API Configuration</div>
+      </div>
+      <div class="panel-body">
+        <div class="api-key-section">
+          <div class="api-key-label">
+            Anthropic API Key
+            <span class="demo-badge" id="modeBadge"><span class="status-dot demo"></span> Demo Mode</span>
+          </div>
+          <input type="password" class="api-key-input" id="apiKeyInput" placeholder="sk-ant-api03-..." />
+          <div class="api-status" id="apiStatus">
+            <span class="status-dot demo"></span>
+            <span id="statusText">Using demo mode (no API key)</span>
+          </div>
+        </div>
+        <div class="tips-box">
+          <strong>Tip:</strong> Add your Anthropic API key for AI-powered predictions. Leave empty to use the built-in demo mode.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon icon-green">📝</div>
+        <div class="panel-title">Input Data</div>
+      </div>
+      <div class="panel-body">
+        <div class="presets-label">Example predictions:</div>
+        <div class="presets">
+          <button class="preset" onclick="loadPreset('business')">Business Decision</button>
+          <button class="preset" onclick="loadPreset('product')">Product Launch</button>
+          <button class="preset" onclick="loadPreset('market')">Market Trend</button>
+          <button class="preset" onclick="loadPreset('team')">Team Performance</button>
+        </div>
+
+        <textarea id="inputText" placeholder="Describe your prediction scenario: What do you want to predict? Include relevant context, data, or situation..."></textarea>
+        <div class="wc" id="wc">0 words</div>
+
+        <div class="goal-wrap">
+          <div class="goal-label">Specific prediction question</div>
+          <input type="text" id="goalInput" placeholder="e.g. Will this product succeed? What outcome is most likely?" />
+        </div>
+
+        <div class="prediction-type-section">
+          <div class="prediction-type-label">Prediction Type</div>
+          <div class="prediction-types">
+            <button class="pred-type active" onclick="setPredType(this, 'outcome')" data-type="outcome">Outcome</button>
+            <button class="pred-type" onclick="setPredType(this, 'risk')" data-type="risk">Risk Assessment</button>
+            <button class="pred-type" onclick="setPredType(this, 'trend')" data-type="trend">Trend Analysis</button>
+            <button class="pred-type" onclick="setPredType(this, 'recommendation')" data-type="recommendation">Recommendation</button>
+          </div>
+        </div>
+
+        <div class="modes">
+          <button class="mode-btn active" onclick="setMode('full')" id="mode-full">
+            <span class="mode-icon">🔭</span>Full Analysis
+          </button>
+          <button class="mode-btn" onclick="setMode('prediction')" id="mode-prediction">
+            <span class="mode-icon">🎯</span>Prediction
+          </button>
+          <button class="mode-btn" onclick="setMode('risk')" id="mode-risk">
+            <span class="mode-icon">⚠️</span>Risk Analysis
+          </button>
+          <button class="mode-btn" onclick="setMode('timeline')" id="mode-timeline">
+            <span class="mode-icon">📅</span>Timeline
+          </button>
+        </div>
+
+        <div class="error-box" id="errBox"></div>
+        <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">Generate Prediction →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: RESULTS -->
+  <div class="right-col" id="rightCol">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🔮</div>
+      <p>Enter your prediction scenario on the left.<br/><strong>PredictLens</strong> will analyze your data and provide AI-powered predictions with confidence levels and risk assessments.</p>
+    </div>
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <p>Generating prediction<span class="dots"></span></p>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentMode = 'full';
+let currentPredType = 'outcome';
+let useDemoMode = true;
+
+const presets = {
+  business: `Business Scenario: SaaS Startup Launch
+
+We are launching a B2B project management tool for mid-sized companies (50-500 employees).
+
+Product Features:
+- AI-powered task prioritization
+- Real-time collaboration
+- Integration with Slack, Jira, GitHub
+- Price point: $15/user/month
+
+Market Research:
+- 65% of target companies currently use spreadsheets
+- Competitor pricing: $20-35/user/month
+- Market growing 12% annually
+- Average sales cycle: 45 days
+
+Launch Plan:
+- Freemium model with 14-day trial
+- Content marketing focus
+- Target: 500 paying customers in first 6 months`,
+
+  product: `Product: Smart Home Energy Monitor
+
+Launch Details:
+- Price: $199 one-time + $5/month subscription
+- Compatible with 95% of US homes
+- Battery backup included
+- Mobile app for iOS and Android
+
+Competitor Analysis:
+- Competitor A: $249 + $8/month (market leader, 40% share)
+- Competitor B: $149 one-time only (no subscription, lower features)
+- Direct competitor pricing: $179-$299
+
+Marketing Budget: $2M for first year
+Sales Target: 50,000 units in year one`,
+
+  market: `Market Trend Analysis: Remote Work Technology
+
+Current State:
+- 45% of workforce now hybrid or fully remote
+- Companies reducing office space by 30%
+- Video conferencing fatigue increasing
+- Demand for async collaboration tools rising
+
+Industry Data:
+- Remote tech market: $45B (2024) → $78B (2027 projected)
+- Average company spending on remote tools: $12,000/year
+- Employee satisfaction with remote: 72%
+- Manager satisfaction with remote: 58%
+
+Emerging Trends:
+- AI-powered productivity tools
+- VR/AR meeting platforms
+- Mental health and wellness integrations`,
+
+  team: `Team Performance Prediction: Engineering Department
+
+Current Metrics:
+- Team size: 15 engineers
+- Average tenure: 2.3 years
+- Sprint velocity: 42 story points/week
+- Bug escape rate: 8 per release
+- Tech debt: estimated 3 months of work
+
+Challenges:
+- 3 senior engineers planning to leave in 6 months
+- New codebase migration in progress
+- Increased product complexity expected
+- Competitor offering 20% higher salaries
+
+Initiatives:
+- New hiring plan: 4 engineers
+- Training budget: $50K
+- Process improvements planned
+- Leadership coaching starting`
+};
+
+function loadPreset(key) {
+  document.getElementById('inputText').value = presets[key];
+  updateWC();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-' + mode).classList.add('active');
+}
+
+function setPredType(btn, type) {
+  currentPredType = type;
+  document.querySelectorAll('.pred-type').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+document.getElementById('apiKeyInput').addEventListener('input', function() {
+  const key = this.value.trim();
+  useDemoMode = !key || key.length < 10;
+  
+  const badge = document.getElementById('modeBadge');
+  const status = document.getElementById('apiStatus');
+  const statusText = document.getElementById('statusText');
+  const dot = status.querySelector('.status-dot');
+  
+  if (useDemoMode) {
+    badge.innerHTML = '<span class="status-dot demo"></span> Demo Mode';
+    dot.className = 'status-dot demo';
+    statusText.textContent = 'Using demo mode (no API key)';
+  } else {
+    badge.innerHTML = '<span class="status-dot"></span> API Connected';
+    dot.className = 'status-dot';
+    statusText.textContent = 'Using Anthropic AI for predictions';
+  }
+});
+
+document.getElementById('inputText').addEventListener('input', updateWC);
+function updateWC() {
+  const words = document.getElementById('inputText').value.trim().split(/\s+/).filter(Boolean).length;
+  document.getElementById('wc').textContent = words + ' word' + (words !== 1 ? 's' : '');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errBox');
+  el.textContent = msg;
+  el.className = 'error-box visible';
+}
+function clearError() {
+  document.getElementById('errBox').className = 'error-box';
+}
+
+function setLoading(v) {
+  document.getElementById('loadingState').className = v ? 'loading-state visible' : 'loading-state';
+  document.getElementById('analyzeBtn').disabled = v;
+}
+
+async function runAnalysis() {
+  const text = document.getElementById('inputText').value.trim();
+  const goal = document.getElementById('goalInput').value.trim();
+
+  if (!text) { showError('Please enter some data to analyze.'); return; }
+  clearError();
+
+  const rc = document.getElementById('rightCol');
+  rc.innerHTML = `<div class="empty-state" id="emptyState" style="display:none"></div><div class="loading-state visible" id="loadingState"><div class="spinner"></div><p>Generating prediction<span class="dots"></span></p></div>`;
+  setLoading(true);
+
+  try {
+    let result;
+    
+    if (useDemoMode) {
+      result = generateDemoPrediction(text, goal);
+    } else {
+      result = await fetchAIAnalysis(text, goal);
+    }
+    
+    renderResults(result);
+  } catch(e) {
+    console.error('Analysis error:', e);
+    rc.innerHTML = '';
+    showError('Analysis failed. Please try again or use demo mode.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function fetchAIAnalysis(text, goal) {
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  
+  const systemPrompt = `You are an expert prediction analyst. Analyze the provided scenario and respond ONLY with a valid JSON object — no markdown, no backticks.
+
+JSON schema:
+{
+  "title": "5-7 word title summarizing the prediction",
+  "primary_prediction": "Main prediction statement (1-2 sentences)",
+  "probability": <integer 0-100>,
+  "confidence": "high" | "medium" | "low",
+  "sentiment": { "positive": <0-100>, "negative": <0-100>, "neutral": <0-100>, "verdict": "string" },
+  "best_case": "1-2 sentences describing best possible outcome",
+  "most_likely": "1-2 sentences describing most probable outcome", 
+  "worst_case": "1-2 sentences describing worst possible outcome",
+  "risk_level": <integer 0-100>,
+  "risk_factors": [{ "factor": "description", "impact": "high" | "medium" | "low" }],
+  "timeline": [{ "timeframe": "e.g. 1-3 months", "event": "description", "type": "positive" | "neutral" | "negative" }],
+  "key_factors": ["factor 1", "factor 2", "factor 3", "factor 4"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
+  "themes": ["theme1", "theme2", "theme3", "theme4"],
+  "insights": ["insight 1", "insight 2", "insight 3", "insight 4"],
+  "summary": "3-4 sentence comprehensive summary with prediction"
+}`;
+
+  const userMsg = `Analyze this scenario and provide a comprehensive prediction:\n\n${text}\n\n${goal ? `Specific question: "${goal}"` : ''}\n\nPrediction type: ${currentPredType}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1500,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+  });
+
+  if (!resp.ok) {
+    throw new Error(`API error: ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const raw = data.content?.map(b => b.text || '').join('').trim();
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+function generateDemoPrediction(text, goal) {
+  const textLower = text.toLowerCase();
+  const wordCount = text.split(/\s+/).length;
+  
+  let baseProbability = 50;
+  let confidence = 'medium';
+  let riskLevel = 45;
+  let sentiment = { positive: 40, negative: 30, neutral: 30, verdict: 'mixed' };
+  let factors = [];
+  let themes = [];
+  let insights = [];
+  
+  const positiveIndicators = ['success', 'great', 'excellent', 'growing', 'improving', 'strong', 'profitable', 'innovative', 'popular', 'high demand', 'satisfied'];
+  const negativeIndicators = ['fail', 'problem', 'challenge', 'risk', 'weak', 'declining', 'loss', 'concern', 'issue', 'difficult', 'low satisfaction'];
+  const growthIndicators = ['growing', 'increasing', 'expanding', 'rising', 'improving', 'positive trend'];
+  const riskIndicators = ['risk', 'threat', 'competition', 'challenges', 'declining', 'uncertain', 'volatile'];
+  
+  let posCount = positiveIndicators.filter(w => textLower.includes(w)).length;
+  let negCount = negativeIndicators.filter(w => textLower.includes(w)).length;
+  let growthCount = growthIndicators.filter(w => textLower.includes(w)).length;
+  let riskCount = riskIndicators.filter(w => textLower.includes(w)).length;
+  
+  baseProbability += (posCount - negCount) * 8;
+  baseProbability += growthCount * 5;
+  baseProbability -= riskCount * 6;
+  baseProbability = Math.max(10, Math.min(95, baseProbability));
+  
+  if (wordCount > 200) {
+    confidence = 'high';
+    riskLevel = Math.max(15, Math.min(85, riskLevel + (negCount - posCount) * 5));
+  } else if (wordCount < 50) {
+    confidence = 'low';
+    riskLevel += 15;
+  }
+  
+  if (posCount > negCount + 2) {
+    sentiment = { positive: 60, negative: 20, neutral: 20, verdict: 'positive' };
+  } else if (negCount > posCount + 2) {
+    sentiment = { positive: 20, negative: 55, neutral: 25, verdict: 'negative' };
+  }
+  
+  if (textLower.includes('competition') || textLower.includes('competitor')) {
+    factors.push({ factor: 'Competitive pressure present', impact: 'high' });
+    riskLevel += 10;
+  }
+  if (textLower.includes('budget') || textLower.includes('investment')) {
+    factors.push({ factor: 'Financial resources defined', impact: 'medium' });
+  }
+  if (textLower.includes('team') || textLower.includes('employees') || textLower.includes('staff')) {
+    factors.push({ factor: 'Team capabilities matter', impact: 'medium' });
+  }
+  if (textLower.includes('market') || textLower.includes('industry')) {
+    factors.push({ factor: 'Market conditions relevant', impact: 'high' });
+  }
+  if (textLower.includes('customer') || textLower.includes('user') || textLower.includes('client')) {
+    factors.push({ factor: 'Customer-focused scenario', impact: 'high' });
+  }
+  
+  if (baseProbability > 65) {
+    themes = ['High Opportunity', 'Favorable Conditions', 'Growth Potential', 'Market Timing'];
+  } else if (baseProbability > 45) {
+    themes = ['Moderate Outlook', 'Conditional Success', 'Execution Dependent', 'Balanced Risk'];
+  } else {
+    themes = ['Challenges Present', 'Cautious Outlook', 'Risk Mitigation Needed', 'Strategic Pivot'];
+  }
+  
+  insights = [
+    `Based on analysis, the scenario shows ${sentiment.verdict} characteristics with ${confidence} confidence.`,
+    `Key success factors include competitive positioning and resource allocation.`,
+    `Risk level assessment at ${riskLevel}% indicates ${riskLevel > 60 ? 'elevated' : riskLevel > 40 ? 'moderate' : 'manageable'} exposure.`,
+    `Recommendation: Focus on identified risk factors while leveraging strengths for optimal outcome.`
+  ];
+  
+  const predType = currentPredType;
+  let prediction = '';
+  let bestCase = '';
+  let mostLikely = '';
+  let worstCase = '';
+  
+  if (textLower.includes('startup') || textLower.includes('launch') || textLower.includes('product')) {
+    prediction = `Product/service launch shows ${baseProbability > 50 ? 'favorable' : 'challenging'} market conditions with potential for ${baseProbability > 60 ? 'strong adoption' : baseProbability > 40 ? 'moderate acceptance' : 'slow uptake'}.`;
+    bestCase = 'Rapid market adoption exceeding targets, strong competitive differentiation, and profitability achieved ahead of schedule.';
+    mostLikely = 'Gradual market penetration with steady growth, meeting core milestones but facing some competitive friction.';
+    worstCase = 'Lower than expected adoption, competitor response stronger than anticipated, extended runway required.';
+  } else if (textLower.includes('team') || textLower.includes('employee') || textLower.includes('performance')) {
+    prediction = `Team performance trajectory suggests ${baseProbability > 55 ? 'positive outcomes' : 'need for intervention'} with key dependencies on retention and productivity.`;
+    bestCase = 'Exceptional team performance, key talent retained, productivity exceeds expectations.';
+    mostLikely = 'Solid performance with expected churn, meeting core objectives with minor adjustments needed.';
+    worstCase = 'Key departures, productivity decline, require significant intervention and realignment.';
+  } else if (textLower.includes('market') || textLower.includes('industry') || textLower.includes('trend')) {
+    prediction = `Market trend analysis indicates ${growthCount > riskCount ? 'upward trajectory' : 'mixed signals'} with ${confidence} confidence in forecast.`;
+    bestCase = 'Favorable market conditions persist, emerging opportunities captured, market share gains.';
+    mostLikely = 'Stable market conditions with typical volatility, maintaining current position.';
+    worstCase = 'Market shift unfavorable, disruption from new entrants, pressure on margins.';
+  } else {
+    prediction = `Analysis suggests a ${baseProbability > 50 ? 'positive' : 'cautious'} outlook with ${confidence} confidence based on available information.`;
+    bestCase = 'All factors align favorably, outcomes exceed expectations, strategic objectives achieved.';
+    mostLikely = 'Mixed results with core objectives met, some challenges navigated successfully.';
+    worstCase = 'Significant obstacles emerge, require course correction, delayed or reduced outcomes.';
+  }
+  
+  let timeline = [
+    { timeframe: '0-3 months', event: 'Initial implementation and early indicators emerge', type: 'neutral' },
+    { timeframe: '3-6 months', event: 'Key milestones and market validation phase', type: 'positive' },
+    { timeframe: '6-12 months', event: 'Full impact realization and strategic assessment', type: baseProbability > 50 ? 'positive' : 'negative' }
+  ];
+  
+  if (riskLevel > 60) {
+    timeline.push({ timeframe: 'Any point', event: 'Risk event could trigger course correction', type: 'negative' });
+  }
+  
+  const recommendations = [
+    'Monitor key success factors closely in first 90 days',
+    'Develop contingency plans for identified risks',
+    `Target probability of ${baseProbability}% - maintain realistic expectations`,
+    'Build in regular review checkpoints for course correction'
+  ];
+  
+  return {
+    title: `Prediction: ${predType.charAt(0).toUpperCase() + predType.slice(1)} Analysis`,
+    primary_prediction: prediction,
+    probability: baseProbability,
+    confidence: confidence,
+    sentiment: sentiment,
+    best_case: bestCase,
+    most_likely: mostLikely,
+    worst_case: worstCase,
+    risk_level: riskLevel,
+    risk_factors: factors.length > 0 ? factors : [{ factor: 'General market and execution risks', impact: 'medium' }],
+    timeline: timeline,
+    key_factors: factors.map(f => f.factor),
+    recommendations: recommendations,
+    themes: themes,
+    insights: insights,
+    summary: insights.join(' ')
+  };
+}
+
+function renderResults(d) {
+  const rc = document.getElementById('rightCol');
+  rc.innerHTML = '';
+  
+  const mode = currentMode;
+
+  // Summary Card
+  const summaryCard = makeCard('📋', d.title || 'Prediction Results', `
+    <p class="summary-text">${d.summary || d.primary_prediction || ''}</p>
+  `);
+  rc.appendChild(summaryCard);
+
+  // Prediction Card
+  if (mode === 'full' || mode === 'prediction') {
+    const p = d;
+    const confClass = p.confidence === 'high' ? 'conf-high' : p.confidence === 'low' ? 'conf-low' : 'conf-med';
+    
+    const predCard = makeCard('🎯', 'Prediction & Probability', `
+      <p class="prediction-main">${p.primary_prediction || '—'}</p>
+      <div class="prob-section">
+        <div class="prob-row">
+          <span class="prob-label-txt">Success probability</span>
+          <span class="prob-val">${p.probability || 50}%</span>
+        </div>
+        <div class="prob-track"><div class="prob-fill" data-pct="${p.probability || 50}"></div></div>
+      </div>
+      <div class="scenarios-grid">
+        <div class="scenario sc-best"><div class="scenario-tag">Best case</div><div class="scenario-text">${p.best_case || '—'}</div></div>
+        <div class="scenario sc-likely"><div class="scenario-tag">Most likely</div><div class="scenario-text">${p.most_likely || '—'}</div></div>
+        <div class="scenario sc-worst"><div class="scenario-tag">Worst case</div><div class="scenario-text">${p.worst_case || '—'}</div></div>
+      </div>`,
+      `<span class="conf-badge ${confClass}">${(p.confidence||'medium').charAt(0).toUpperCase()+(p.confidence||'medium').slice(1)} confidence</span>`
+    );
+    rc.appendChild(predCard);
+    setTimeout(() => {
+      predCard.querySelectorAll('.prob-fill').forEach(el => {
+        const pct = el.dataset.pct;
+        el.style.width = pct + '%';
+        el.style.background = pct >= 60 ? '#52b788' : pct >= 35 ? '#f59e0b' : '#e24b4a';
+      });
+    }, 80);
+  }
+
+  // Risk Analysis
+  if (mode === 'full' || mode === 'risk') {
+    const riskLevel = d.risk_level || 45;
+    const factors = d.risk_factors || [];
+    
+    const factorsHtml = factors.map(f => `
+      <div class="factor-item">
+        <span class="factor-impact ${f.impact}">${f.impact.toUpperCase()}</span>
+        <span class="factor-text">${f.factor}</span>
+      </div>
+    `).join('');
+    
+    const riskCard = makeCard('⚠️', 'Risk Assessment', `
+      <div class="risk-meter">
+        <span style="font-size:13px;color:var(--ink-light);">Risk Level</span>
+        <div style="flex:1;">
+          <div class="risk-track">
+            <div class="risk-indicator" data-pos="${riskLevel}" style="left: calc(${riskLevel}% - 9px);"></div>
+          </div>
+          <div class="risk-labels"><span>Low</span><span>Medium</span><span>High</span></div>
+        </div>
+        <span style="font-size:18px;font-weight:500;font-family:'DM Mono',monospace;">${riskLevel}%</span>
+      </div>
+      <h4 style="font-size:12px;font-weight:500;color:var(--ink-light);margin:1rem 0 8px;text-transform:uppercase;">Key Risk Factors</h4>
+      <div class="factors-list">${factorsHtml}</div>
+    `);
+    rc.appendChild(riskCard);
+  }
+
+  // Timeline
+  if (mode === 'full' || mode === 'timeline') {
+    const timeline = d.timeline || [];
+    const timelineHtml = timeline.map(t => {
+      const dotClass = t.type === 'positive' ? '' : t.type === 'negative' ? 'negative' : 'warning';
+      return `
+        <div class="timeline-item">
+          <div class="timeline-dot ${dotClass}"></div>
+          <div class="timeline-time">${t.timeframe}</div>
+          <div class="timeline-text">${t.event}</div>
+        </div>
+      `;
+    }).join('');
+    
+    const timelineCard = makeCard('📅', 'Timeline & Milestones', `
+      <div class="timeline">${timelineHtml}</div>
+    `);
+    rc.appendChild(timelineCard);
+  }
+
+  // Sentiment
+  if (mode === 'full') {
+    const s = d.sentiment || { positive: 50, negative: 25, neutral: 25, verdict: 'neutral' };
+    const verdictClass = s.verdict === 'positive' ? 'verdict-pos' : s.verdict === 'negative' ? 'verdict-neg' : 'verdict-neu';
+    const verdictIcon = s.verdict === 'positive' ? '↑' : s.verdict === 'negative' ? '↓' : '→';
+
+    const sentCard = makeCard('💬', 'Sentiment Analysis', `
+      ${makeBar('Positive', s.positive || 0, '#52b788')}
+      ${makeBar('Negative', s.negative || 0, '#e24b4a')}
+      ${makeBar('Neutral', s.neutral || 0, '#888')}
+      <div class="sentiment-verdict ${verdictClass}" style="margin-top:1rem;">
+        <span style="font-size:18px;">${verdictIcon}</span>
+        <span>Overall: ${s.verdict || 'neutral'}</span>
+      </div>
+    `);
+    rc.appendChild(sentCard);
+    setTimeout(() => {
+      sentCard.querySelectorAll('.bar-fill').forEach(el => {
+        el.style.width = el.dataset.pct + '%';
+      });
+    }, 80);
+  }
+
+  // Themes
+  if (mode === 'full') {
+    const themes = d.themes || [];
+    const chipsHtml = themes.map(t => `<span class="theme-chip">${t}</span>`).join('');
+    const themesCard = makeCard('🏷️', 'Key Themes', `<div class="themes-list">${chipsHtml}</div>`);
+    rc.appendChild(themesCard);
+  }
+
+  // Insights
+  if (mode === 'full') {
+    const insights = d.insights || [];
+    const insHtml = insights.map((ins, i) =>
+      `<div class="insight-item"><div class="insight-num">${i+1}</div><div class="insight-text">${ins}</div></div>`
+    ).join('');
+    const insCard = makeCard('💡', 'Key Insights', insHtml);
+    rc.appendChild(insCard);
+  }
+
+  // Recommendations
+  if (mode === 'full') {
+    const recs = d.recommendations || [];
+    const recHtml = recs.map((r, i) =>
+      `<div class="insight-item"><div class="insight-num">${i+1}</div><div class="insight-text">${r}</div></div>`
+    ).join('');
+    const recCard = makeCard('✅', 'Recommendations', recHtml);
+    rc.appendChild(recCard);
+  }
+}
+
+function makeBar(label, pct, color) {
+  return `<div class="sentiment-bar-row">
+    <span class="sentiment-name">${label}</span>
+    <div class="bar-track"><div class="bar-fill" data-pct="${pct}" style="background:${color};"></div></div>
+    <span class="bar-pct">${pct}%</span>
+  </div>`;
+}
+
+function makeCard(icon, title, bodyHtml, badgeHtml = '') {
+  const div = document.createElement('div');
+  div.className = 'result-block';
+  div.innerHTML = `
+    <div class="result-block-header">
+      <div class="result-block-title"><span>${icon}</span> ${title}</div>
+      ${badgeHtml}
+    </div>
+    <div class="result-block-body">${bodyHtml}</div>
+  `;
+  return div;
+}
+</script>
+</body>
+</html>

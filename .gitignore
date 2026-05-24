@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+server_out.txt
+server_err.txt
+debug_out.txt
+debug_err.txt

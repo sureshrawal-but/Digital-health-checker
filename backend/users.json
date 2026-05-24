@@ -1,0 +1,14 @@
+{
+  "Suresh": {
+    "password": "f791733334d4a7e5c5446f0d336fe5f54680b788d5975f83b0233e1b54f89bbe",
+    "role": "admin",
+    "created_at": "2026-05-24T14:00:00",
+    "searches": []
+  },
+  "sureshrawal": {
+    "password": "f791733334d4a7e5c5446f0d336fe5f54680b788d5975f83b0233e1b54f89bbe",
+    "role": "user",
+    "created_at": "2026-05-24T16:40:43.128195",
+    "searches": []
+  }
+}
