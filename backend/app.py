@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import hashlib
 import secrets
 import datetime
@@ -12,6 +13,11 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+
+# Ensure backend/ is on sys.path so health_checker imports work from any CWD
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 from health_checker import DigitalHealthChecker
 
@@ -194,7 +200,7 @@ def get_current_user(authorization: str = Header(None)):
 
 # ── Frontend ──
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+FRONTEND_DIR = os.path.join(_BACKEND_DIR, "..", "frontend")
 
 @app.get("/")
 def serve_frontend():
