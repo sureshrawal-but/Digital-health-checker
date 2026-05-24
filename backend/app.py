@@ -8,7 +8,8 @@ import time
 import jwt
 from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 
@@ -191,23 +192,13 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Token expired or invalid. Please login again.")
     return payload
 
-# ── Root ──
+# ── Frontend ──
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 @app.get("/")
-def root():
-    return {
-        "app": "Digital Health Checker",
-        "version": "2.1.0",
-        "status": "running",
-        "endpoints": {
-            "register": "POST /auth/register",
-            "login": "POST /auth/login",
-            "me": "GET /auth/me",
-            "analyze": "POST /analyze (auth required)",
-            "admin_users": "GET /admin/users (admin only)",
-            "admin_searches": "GET /admin/searches (admin only)"
-        }
-    }
+def serve_frontend():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
 # ── Auth Endpoints ──
 
@@ -410,6 +401,10 @@ def admin_searches(authorization: str = Header(None)):
             all_searches.append(safe)
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
+
+# ── Serve static frontend files ──
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn

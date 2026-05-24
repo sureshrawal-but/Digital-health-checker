@@ -308,7 +308,7 @@
         <span class="text-3xl">📡</span>
         <div class="flex-1">
           <h3 class="font-display font-bold text-lg text-gray-900 mb-1">Backend Offline</h3>
-          <p class="text-sm text-gray-600 mb-3">Start the Python backend on <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">http://localhost:8000</code></p>
+          <p class="text-sm text-gray-600 mb-3">Backend API server status is shown below</p>
           <div class="bg-gray-50 rounded-xl p-3 mb-4 text-sm">
             <code class="block bg-gray-900 text-green-400 p-2.5 rounded-lg text-xs font-mono">cd backend<br/>pip install -r requirements.txt<br/>uvicorn app:app --port 8000</code>
           </div>
@@ -386,7 +386,7 @@ async function doLogin() {
   if (!u || !p) { err.textContent = 'Please enter username and password'; err.classList.remove('hidden'); return; }
   err.classList.add('hidden');
   try {
-    const r = await fetch('http://localhost:8000/auth/login', {
+    const r = await fetch('/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: u, password: p })
     });
@@ -410,7 +410,7 @@ async function doRegister() {
   if (!u || !p) { err.textContent = 'Please enter username and password'; err.classList.remove('hidden'); return; }
   err.classList.add('hidden');
   try {
-    const r = await fetch('http://localhost:8000/auth/register', {
+    const r = await fetch('/auth/register', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: u, password: p })
     });
@@ -455,7 +455,7 @@ async function checkBackendConnection() {
   dot.className = 'w-2 h-2 rounded-full inline-block bg-gray-400';
   text.textContent = 'Checking...';
   try {
-    const resp = await fetch('http://localhost:8000/health', { signal: AbortSignal.timeout(3000) });
+    const resp = await fetch('/health', { signal: AbortSignal.timeout(3000) });
     if (resp.ok) {
       backendOnline = true;
       dot.className = 'w-2 h-2 rounded-full inline-block bg-green-500';
@@ -499,7 +499,7 @@ async function runAnalysis() {
 }
 
 async function callBackend(name, url) {
-  const resp = await fetch('http://localhost:8000/analyze', {
+  const resp = await fetch('/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
     body: JSON.stringify({ business_name: name, website_url: url || null })
@@ -514,8 +514,8 @@ async function callBackend(name, url) {
 async function loadAdminData() {
   try {
     const [uRes, sRes] = await Promise.all([
-      fetch('http://localhost:8000/admin/users', { headers: { 'Authorization': 'Bearer ' + authToken } }),
-      fetch('http://localhost:8000/admin/searches', { headers: { 'Authorization': 'Bearer ' + authToken } })
+      fetch('/admin/users', { headers: { 'Authorization': 'Bearer ' + authToken } }),
+      fetch('/admin/searches', { headers: { 'Authorization': 'Bearer ' + authToken } })
     ]);
     if (uRes.status === 403 || sRes.status === 403) { showToast('Admin access only', 'error'); return; }
     const uData = await uRes.json();
