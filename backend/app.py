@@ -21,7 +21,7 @@ if _BACKEND_DIR not in sys.path:
 
 from health_checker import DigitalHealthChecker
 
-USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
+USERS_FILE = os.path.join(_BACKEND_DIR, "users.json")
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 TOKEN_EXPIRY_DAYS = 7
 MAX_LOGIN_ATTEMPTS = 5
