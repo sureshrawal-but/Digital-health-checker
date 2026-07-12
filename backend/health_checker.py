@@ -24,8 +24,12 @@ class DigitalHealthChecker:
         self.headers = {}
 
     def run_all_checks(self):
-        if self.website_url:
-            self._fetch_website()
+        # Wrap fetch in try/except to prevent 500 on fetch failure
+        try:
+            if self.website_url:
+                self._fetch_website()
+        except Exception:
+            pass
         
         # Wrap each check in try/except to prevent one failure from breaking the whole analysis
         try:
