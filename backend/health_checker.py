@@ -3,9 +3,28 @@ import re
 import json
 import ssl
 import socket
+import os
 from urllib.parse import urlparse, urljoin
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ── Optional API Keys (set via environment variables) ──
+PAGESPEED_API_KEY = os.environ.get('PAGESPEED_API_KEY')
+GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY')
+FACEBOOK_ACCESS_TOKEN = os.environ.get('FACEBOOK_ACCESS_TOKEN')
+INSTAGRAM_ACCESS_TOKEN = os.environ.get('INSTAGRAM_ACCESS_TOKEN')
+TWITTER_BEARER_TOKEN = os.environ.get('TWITTER_BEARER_TOKEN')
+LINKEDIN_ACCESS_TOKEN = os.environ.get('LINKEDIN_ACCESS_TOKEN')
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
+
+# Optional API keys (set via environment variables)
+PAGESPEED_API_KEY = os.environ.get("PAGESPEED_API_KEY")
+GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY")
+FACEBOOK_ACCESS_TOKEN = os.environ.get("FACEBOOK_ACCESS_TOKEN")
+INSTAGRAM_ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+TWITTER_BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
+LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
 
 class DigitalHealthChecker:
@@ -118,6 +137,41 @@ class DigitalHealthChecker:
         if tech_stack:
             self.wins.append(f"✅ Detected: {', '.join(tech_stack[:3])}")
 
+        # ── PageSpeed API for Core Web Vitals ──
+        pagespeed = self._fetch_pagespeed()
+        if pagespeed:
+            details['pagespeed'] = self._parse_pagespeed(pagespeed)
+            cwv = details['pagespeed'].get('core_web_vitals', {})
+            perf_score = details['pagespeed'].get('performance_score')
+            if cwv.get('lcp', 0) < 2.5:
+                self.wins.append("✅ LCP (Largest Contentful Paint) < 2.5s")
+            elif cwv.get('lcp'):
+                self.issues.append(f"⚠️ LCP (Largest Contentful Paint) is {cwv['lcp']}s — target < 2.5s")
+            if cwv.get('cls', 1) < 0.1:
+                self.wins.append("✅ CLS (Cumulative Layout Shift) < 0.1")
+            elif cwv.get('cls'):
+                self.issues.append(f"⚠️ CLS (Cumulative Layout Shift) is {cwv['cls']} — target < 0.1")
+            if cwv.get('fid', 0) < 100:
+                self.wins.append("✅ FID (First Input Delay) < 100ms")
+            elif cwv.get('fid'):
+                self.issues.append(f"⚠️ FID (First Input Delay) is {cwv['fid']}ms — target < 100ms")
+            if cwv.get('inp', 0) < 200:
+                self.wins.append("✅ INP (Interaction to Next Paint) < 200ms")
+            elif cwv.get('inp'):
+                self.issues.append(f"⚠️ INP (Interaction to Next Paint) is {cwv['inp']}ms — target < 200ms")
+            if perf_score is not None:
+                if perf_score >= 90:
+                    self.wins.append(f"✅ PageSpeed Performance: {int(perf_score)}/100")
+                elif perf_score >= 50:
+                    self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — needs improvement")
+                else:
+                    self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — poor")
+                    self.wins.append(f"✅ PageSpeed Performance: {perf_score}/100")
+                elif perf_score >= 50:
+                    self.issues.append(f"⚠️ PageSpeed Performance: {perf_score}/100 — needs improvement")
+                else:
+                    self.issues.append(f"⚠️ PageSpeed Performance: {perf_score}/100 — poor")
+
         score = min(score, 20)
         self.scores['website_presence'] = score
         self.details['website_presence'] = details
@@ -142,6 +196,60 @@ class DigitalHealthChecker:
         except Exception as e:
             return {'valid': False, 'error': str(e)}
         return {'valid': False, 'error': 'unknown'}
+
+    def _fetch_pagespeed(self, strategy='mobile'):
+        """Fetch PageSpeed Insights data for the website."""
+        if not PAGESPEED_API_KEY:
+            return None
+        if not self.website_url:
+            return None
+        try:
+            api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+            params = {
+                'url': self.final_url,
+                'key': PAGESPEED_API_KEY,
+                'category': ['PERFORMANCE', 'ACCESSIBILITY', 'BEST_PRACTICES', 'SEO'],
+                'strategy': strategy
+            }
+            resp = requests.get(api_url, params=params, timeout=30)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception:
+            pass
+        return None
+
+    def _parse_pagespeed(self, data):
+        """Parse PageSpeed Insights response into readable metrics."""
+        try:
+            lighthouse = data.get('lighthouseResult', {})
+            categories = lighthouse.get('categories', {})
+            audits = lighthouse.get('audits', {})
+            
+            metrics = {}
+            metric_map = {
+                'largest-contentful-paint': 'lcp',
+                'first-input-delay': 'fid',
+                'cumulative-layout-shift': 'cls',
+                'interaction-to-next-paint': 'inp',
+                'first-contentful-paint': 'fcp',
+                'speed-index': 'si',
+                'total-blocking-time': 'tbt'
+            }
+            for key, name in metric_map.items():
+                audit = audits.get(key, {})
+                if 'numericValue' in audit:
+                    metrics[name] = round(audit['numericValue'] / 1000, 2) if key in ['largest-contentful-paint', 'first-input-delay', 'interaction-to-next-paint', 'first-contentful-paint', 'speed-index', 'total-blocking-time'] else round(audit['numericValue'], 3)
+            
+            return {
+                'performance_score': categories.get('performance', {}).get('score', 0) * 100,
+                'accessibility_score': categories.get('accessibility', {}).get('score', 0) * 100,
+                'best_practices_score': categories.get('best-practices', {}).get('score', 0) * 100,
+                'seo_score': categories.get('seo', {}).get('score', 0) * 100,
+                'core_web_vitals': metrics,
+                'url': data.get('id', '')
+            }
+        except Exception:
+            return {}
 
     def _check_security_headers(self):
         headers = self.headers
@@ -190,6 +298,171 @@ class DigitalHealthChecker:
             tech.append('Apache')
         return tech
 
+    # ── Optional API Integrations ──
+
+    def _get_pagespeed_metrics(self):
+        """Fetch Core Web Vitals from PageSpeed Insights API."""
+        if not PAGESPEED_API_KEY or not self.website_url:
+            return None
+        url = self.website_url if self.website_url.startswith(('http://', 'https://')) else f'https://{self.website_url}'
+        api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+        params = {
+            'url': url,
+            'key': PAGESPEED_API_KEY,
+            'category': ['PERFORMANCE', 'ACCESSIBILITY', 'BEST_PRACTICES', 'SEO'],
+            'strategy': 'mobile'
+        }
+        try:
+            resp = requests.get(api_url, params=params, timeout=30)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception:
+            pass
+        return None
+
+    def _get_google_business_data(self):
+        """Fetch Google Business Profile data from Places API."""
+        if not GOOGLE_PLACES_API_KEY:
+            return None
+        try:
+            # Search for the business
+            search_url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+            params = {
+                'input': self.business_name,
+                'inputtype': 'textquery',
+                'fields': 'place_id,name,formatted_address,rating,user_ratings_total,business_status,geometry',
+                'key': GOOGLE_PLACES_API_KEY
+            }
+            resp = requests.get(search_url, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get('candidates', [])
+                if candidates:
+                    place_id = candidates[0].get('place_id')
+                    # Get detailed info
+                    details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+                    details_params = {
+                        'place_id': place_id,
+                        'fields': 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,photos,reviews,business_status,url',
+                        'key': GOOGLE_PLACES_API_KEY
+                    }
+                    details_resp = requests.get(details_url, params=details_params, timeout=15)
+                    if details_resp.status_code == 200:
+                        return details_resp.json().get('result', {})
+        except Exception:
+            pass
+        return None
+
+    def _get_facebook_data(self):
+        """Fetch Facebook page data via Graph API."""
+        if not FACEBOOK_ACCESS_TOKEN:
+            return None
+        try:
+            # Search for page by name
+            search_url = "https://graph.facebook.com/v18.0/search"
+            params = {
+                'type': 'page',
+                'q': self.business_name,
+                'fields': 'id,name,fan_count,about,website,link,category,rating_count,overall_star_rating,location',
+                'access_token': FACEBOOK_ACCESS_TOKEN
+            }
+            resp = requests.get(search_url, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                pages = data.get('data', [])
+                if pages:
+                    return pages[0]
+        except Exception:
+            pass
+        return None
+
+    def _get_instagram_data(self):
+        """Fetch Instagram business account data."""
+        if not INSTAGRAM_ACCESS_TOKEN:
+            return None
+        try:
+            # Instagram Basic Display API or Graph API
+            # For business accounts, use Graph API
+            url = "https://graph.facebook.com/v18.0/me"
+            params = {
+                'fields': 'id,username,media_count,followers_count,follows_count,biography,website,profile_picture_url',
+                'access_token': INSTAGRAM_ACCESS_TOKEN
+            }
+            resp = requests.get(url, params=params, timeout=15)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception:
+            pass
+        return None
+
+    def _get_twitter_data(self):
+        """Fetch Twitter/X account data via API v2."""
+        if not TWITTER_BEARER_TOKEN:
+            return None
+        try:
+            # Search for user by username
+            headers = {'Authorization': f'Bearer {TWITTER_BEARER_TOKEN}'}
+            search_url = "https://api.twitter.com/2/users/by"
+            params = {
+                'usernames': self.business_name.replace(' ', '').lower(),
+                'user.fields': 'public_metrics,description,verified,location,url,profile_image_url'
+            }
+            resp = requests.get(search_url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                users = data.get('data', [])
+                if users:
+                    return users[0]
+        except Exception:
+            pass
+        return None
+
+    def _get_linkedin_data(self):
+        """Fetch LinkedIn company page data."""
+        if not LINKEDIN_ACCESS_TOKEN:
+            return None
+        try:
+            # LinkedIn API requires organization lookup
+            headers = {'Authorization': f'Bearer {LINKEDIN_ACCESS_TOKEN}'}
+            # Simplified - would need org ID lookup
+            return {'note': 'LinkedIn API requires organization ID; set up manually'}
+        except Exception:
+            pass
+        return None
+
+    def _get_youtube_data(self):
+        """Fetch YouTube channel data."""
+        if not YOUTUBE_API_KEY:
+            return None
+        try:
+            search_url = "https://www.googleapis.com/youtube/v3/search"
+            params = {
+                'part': 'snippet',
+                'q': self.business_name,
+                'type': 'channel',
+                'maxResults': 1,
+                'key': YOUTUBE_API_KEY
+            }
+            resp = requests.get(search_url, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data.get('items', [])
+                if items:
+                    channel_id = items[0]['snippet']['channelId']
+                    # Get channel stats
+                    stats_url = "https://www.googleapis.com/youtube/v3/channels"
+                    stats_params = {
+                        'part': 'statistics,snippet,brandingSettings',
+                        'id': channel_id,
+                        'key': YOUTUBE_API_KEY
+                    }
+                    stats_resp = requests.get(stats_url, params=stats_params, timeout=15)
+                    if stats_resp.status_code == 200:
+                        return stats_resp.json().get('items', [{}])[0]
+        except Exception:
+            pass
+        return None
+
     def check_google_business(self):
         score = 0
         details = {}
@@ -219,6 +492,25 @@ class DigitalHealthChecker:
             details['map_embed'] = True
             self.wins.append("✅ Google Maps embed detected")
 
+        # ── Google Places API for real GBP data ──
+        gbp_data = self._get_google_business_data()
+        if gbp_data:
+            details['google_business_profile'] = {
+                'name': gbp_data.get('name'),
+                'address': gbp_data.get('formatted_address'),
+                'phone': gbp_data.get('formatted_phone_number'),
+                'website': gbp_data.get('website'),
+                'rating': gbp_data.get('rating'),
+                'review_count': gbp_data.get('user_ratings_total'),
+                'status': gbp_data.get('business_status'),
+                'place_id': gbp_data.get('place_id'),
+                'maps_url': gbp_data.get('url')
+            }
+            score += 8
+            self.wins.append(f"✅ Verified Google Business Profile: {gbp_data.get('name')} ({gbp_data.get('user_ratings_total', 0)} reviews, {gbp_data.get('rating', 'N/A')}★)")
+        else:
+            self.issues.append("⚠️ No verified Google Business Profile found via Places API")
+
         score += 2
         details['profile_possible'] = True
 
@@ -242,8 +534,9 @@ class DigitalHealthChecker:
         }
 
         found_platforms = []
-        platform_urls = {}
+        platform_data = {}
 
+        # ── Website-based detection (existing) ──
         if self.website_url and self.resp and self.resp.status_code == 200:
             html_lower = self.html.lower()
             for platform, domains in social_platforms.items():
@@ -261,9 +554,89 @@ class DigitalHealthChecker:
                         found_platforms.append(platform)
                     break
 
+        # ── Optional API-based real data ──
+        api_data = {}
+
+        # Facebook Graph API
+        fb_data = self._get_facebook_data()
+        if fb_data:
+            api_data['facebook'] = {
+                'name': fb_data.get('name'),
+                'followers': fb_data.get('fan_count', 0),
+                'category': fb_data.get('category'),
+                'rating': fb_data.get('overall_star_rating'),
+                'rating_count': fb_data.get('rating_count'),
+                'website': fb_data.get('website'),
+                'url': fb_data.get('link')
+            }
+            if 'facebook' not in found_platforms:
+                found_platforms.append('facebook')
+
+        # Instagram Graph API
+        ig_data = self._get_instagram_data()
+        if ig_data:
+            api_data['instagram'] = {
+                'username': ig_data.get('username'),
+                'followers': ig_data.get('followers_count', 0),
+                'following': ig_data.get('follows_count', 0),
+                'posts': ig_data.get('media_count', 0),
+                'bio': ig_data.get('biography'),
+                'website': ig_data.get('website'),
+                'profile_pic': ig_data.get('profile_picture_url')
+            }
+            if 'instagram' not in found_platforms:
+                found_platforms.append('instagram')
+
+        # Twitter/X API v2
+        tw_data = self._get_twitter_data()
+        if tw_data:
+            metrics = tw_data.get('public_metrics', {})
+            api_data['twitter'] = {
+                'username': tw_data.get('username'),
+                'followers': metrics.get('followers_count', 0),
+                'following': metrics.get('following_count', 0),
+                'tweets': metrics.get('tweet_count', 0),
+                'listed': metrics.get('listed_count', 0),
+                'verified': tw_data.get('verified', False),
+                'description': tw_data.get('description'),
+                'url': tw_data.get('url'),
+                'profile_image': tw_data.get('profile_image_url')
+            }
+            if 'twitter' not in found_platforms:
+                found_platforms.append('twitter')
+
+        # YouTube Data API
+        yt_data = self._get_youtube_data()
+        if yt_data:
+            stats = yt_data.get('statistics', {})
+            snippet = yt_data.get('snippet', {})
+            api_data['youtube'] = {
+                'title': snippet.get('title'),
+                'subscribers': int(stats.get('subscriberCount', 0)),
+                'views': int(stats.get('viewCount', 0)),
+                'videos': int(stats.get('videoCount', 0)),
+                'description': snippet.get('description'),
+                'channel_id': yt_data.get('id'),
+                'profile_image': snippet.get('thumbnails', {}).get('high', {}).get('url')
+            }
+            if 'youtube' not in found_platforms:
+                found_platforms.append('youtube')
+
+        # LinkedIn (limited API)
+        li_data = self._get_linkedin_data()
+        if li_data:
+            api_data['linkedin'] = li_data
+            if 'linkedin' not in found_platforms:
+                found_platforms.append('linkedin')
+
+        if api_data:
+            details['api_data'] = api_data
+            self.wins.append(f"✅ Fetched real-time social data for {len(api_data)} platform(s)")
+
         score += min(len(found_platforms) * 3, 12)
         details['platforms_found'] = found_platforms
         details['platform_count'] = len(found_platforms)
+        details['platform_data'] = api_data
 
         if found_platforms:
             self.wins.append(f"✅ Social presence: {', '.join(found_platforms)}")
