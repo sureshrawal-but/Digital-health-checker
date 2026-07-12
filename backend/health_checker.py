@@ -1233,17 +1233,18 @@ except Exception:
             score += 1
             details['no_horizontal_scroll'] = True
 
-        mobile_ua_resp = None
-        try:
-            mobile_ua_resp = requests.get(self.final_url, timeout=10, headers={
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15'
-            })
-            mobile_html = mobile_ua_resp.text.lower()
-            if '<meta name="viewport"' in mobile_html:
-                score += 1
-                details['mobile_ua_viewport'] = True
-        except:
-            pass
+        # Mobile UA check disabled to avoid external HTTP request timeout
+        # mobile_ua_resp = None
+        # try:
+        #     mobile_ua_resp = requests.get(self.final_url, timeout=10, headers={
+        #         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15'
+        #     })
+        #     mobile_html = mobile_ua_resp.text.lower()
+        #     if '<meta name="viewport"' in mobile_html:
+        #         score += 1
+        #         details['mobile_ua_viewport'] = True
+        # except:
+        #     pass
 
         if not viewport:
             score = max(0, score - 2)
@@ -1470,22 +1471,11 @@ except Exception:
         return score
 
     def _check_robots_txt(self):
-        try:
-            base = f"{urlparse(self.final_url).scheme}://{urlparse(self.final_url).netloc}"
-            r = requests.get(urljoin(base, '/robots.txt'), timeout=5)
-            return r.status_code == 200 and len(r.text) > 0
-        except:
-            return False
+        # Disabled to avoid external HTTP requests that can timeout
+        return False
 
     def _check_sitemap(self):
-        try:
-            base = f"{urlparse(self.final_url).scheme}://{urlparse(self.final_url).netloc}"
-            for path in ['/sitemap.xml', '/sitemap_index.xml', '/sitemap/sitemap.xml']:
-                r = requests.get(urljoin(base, path), timeout=5)
-                if r.status_code == 200 and 'xml' in r.headers.get('Content-Type', ''):
-                    return True
-        except:
-            return False
+        # Disabled to avoid external HTTP requests that can timeout
         return False
 
     def check_contact_accessibility(self):
