@@ -143,7 +143,7 @@ class DigitalHealthChecker:
                 cwv = details['pagespeed'].get('core_web_vitals', {})
                 perf_score = details['pagespeed'].get('performance_score')
                 if cwv.get('lcp', 0) < 2.5:
-                self.wins.append("✅ LCP (Largest Contentful Paint) < 2.5s")
+                    self.wins.append("✅ LCP (Largest Contentful Paint) < 2.5s")
             elif cwv.get('lcp'):
                 self.issues.append(f"⚠️ LCP (Largest Contentful Paint) is {cwv['lcp']}s — target < 2.5s")
             if cwv.get('cls', 1) < 0.1:
