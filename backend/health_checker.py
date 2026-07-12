@@ -169,10 +169,10 @@ class DigitalHealthChecker:
 except Exception:
             pass
 
-        # ── Deep HTTP-only Analysis ──
-        try:
-            perf_deep = self._deep_performance_analysis()
-            if perf_deep:
+        # ── Deep HTTP-only Analysis (disabled for stability) ──
+        # try:
+        #     perf_deep = self._deep_performance_analysis()
+        #     if perf_deep:
             details['deep_performance'] = perf_deep
             # Score adjustments based on deep analysis
             if perf_deep.get('resource_hints', {}).get('preload', 0) > 0:
@@ -207,28 +207,28 @@ except Exception:
             if perf_deep.get('critical_css_inline'):
                 self.wins.append("✅ Critical CSS inlined")
 
-        # Core Web Vitals estimation
-        try:
-            cwv_est = self._estimate_core_web_vitals()
-            if cwv_est:
-                details['core_web_vitals_estimate'] = cwv_est
-                lcp = cwv_est.get('lcp_likelihood', 'unknown')
-                cls = cwv_est.get('cls_likelihood', 'unknown')
-                fid = cwv_est.get('fid_likelihood', 'unknown')
-                if lcp == 'good':
-                    self.wins.append("✅ Estimated LCP: Good")
-                elif lcp == 'poor':
-                    self.issues.append("⚠️ Estimated LCP: Poor — optimize hero image/loading")
-                if cls == 'good':
-                    self.wins.append("✅ Estimated CLS: Good")
-                elif cls == 'poor':
-                    self.issues.append("⚠️ Estimated CLS: Poor — add dimensions to images/fonts")
-                if fid == 'good':
-                    self.wins.append("✅ Estimated FID/INP: Good")
-                elif fid == 'poor':
-                    self.issues.append("⚠️ Estimated FID/INP: Poor — reduce main thread blocking")
-        except Exception:
-            pass
+        # Core Web Vitals estimation (disabled for stability)
+        # try:
+        #     cwv_est = self._estimate_core_web_vitals()
+        #     if cwv_est:
+        #         details['core_web_vitals_estimate'] = cwv_est
+        #         lcp = cwv_est.get('lcp_likelihood', 'unknown')
+        #         cls = cwv_est.get('cls_likelihood', 'unknown')
+        #         fid = cwv_est.get('fid_likelihood', 'unknown')
+        #         if lcp == 'good':
+        #             self.wins.append("✅ Estimated LCP: Good")
+        #         elif lcp == 'poor':
+        #             self.issues.append("⚠️ Estimated LCP: Poor — optimize hero image/loading")
+        #         if cls == 'good':
+        #             self.wins.append("✅ Estimated CLS: Good")
+        #         elif cls == 'poor':
+        #             self.issues.append("⚠️ Estimated CLS: Poor — add dimensions to images/fonts")
+        #         if fid == 'good':
+        #             self.wins.append("✅ Estimated FID/INP: Good")
+        #         elif fid == 'poor':
+        #             self.issues.append("⚠️ Estimated FID/INP: Poor — reduce main thread blocking")
+        # except Exception:
+        #     pass
 
         # Deep SEO analysis
         try:
@@ -251,14 +251,14 @@ except Exception:
             pass
 
         # Deep accessibility analysis
-        try:
-            a11y_deep = self._deep_accessibility_analysis()
-            if a11y_deep:
-                details['deep_accessibility'] = a11y_deep
-                if a11y_deep.get('lang'):
-                    self.wins.append("✅ Language attribute declared")
-        except Exception:
-            pass
+        # try:
+        #     a11y_deep = self._deep_accessibility_analysis()
+        #     if a11y_deep:
+        #         details['deep_accessibility'] = a11y_deep
+        #         if a11y_deep.get('lang'):
+        #             self.wins.append("✅ Language attribute declared")
+        # except Exception:
+        #     pass
 
         score = min(score, 20)
         self.scores['website_presence'] = score
