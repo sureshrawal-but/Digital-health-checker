@@ -233,7 +233,6 @@ class DigitalHealthChecker:
         score = min(score, 20)
         self.scores['website_presence'] = score
         self.details['website_presence'] = details
-        # DEEP_ANALYSIS_V2: deep analysis deployed
         return score
 
     def _check_ssl_details(self):
