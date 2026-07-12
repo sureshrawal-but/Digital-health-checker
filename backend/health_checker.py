@@ -26,13 +26,43 @@ class DigitalHealthChecker:
     def run_all_checks(self):
         if self.website_url:
             self._fetch_website()
-        self.check_website_presence()
-        self.check_google_business()
-        self.check_social_media()
-        self.check_mobile_friendly()
-        self.check_online_reviews()
-        self.check_seo_basics()
-        self.check_contact_accessibility()
+        
+        # Wrap each check in try/except to prevent one failure from breaking the whole analysis
+        try:
+            self.check_website_presence()
+        except Exception:
+            pass
+        
+        try:
+            self.check_google_business()
+        except Exception:
+            pass
+        
+        try:
+            self.check_social_media()
+        except Exception:
+            pass
+        
+        try:
+            self.check_mobile_friendly()
+        except Exception:
+            pass
+        
+        try:
+            self.check_online_reviews()
+        except Exception:
+            pass
+        
+        try:
+            self.check_seo_basics()
+        except Exception:
+            pass
+        
+        try:
+            self.check_contact_accessibility()
+        except Exception:
+            pass
+        
         self.calculate_total()
         return self.get_report()
 
