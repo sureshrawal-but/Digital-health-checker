@@ -75,8 +75,23 @@ class DigitalHealthChecker:
             print(f"Contact accessibility error: {e}")
             pass
         
-        self.calculate_total()
-        return self.get_report()
+        # Wrap final steps in try/except
+        try:
+            self.calculate_total()
+            return self.get_report()
+        except Exception as e:
+            print(f"Final report error: {e}")
+            # Return minimal report on error
+            return {
+                "business_name": self.business_name,
+                "website_url": self.website_url,
+                "total_score": 0,
+                "health_status": {"status": "Error", "color": "red", "emoji": "🔴", "type": "error"},
+                "category_scores": self.get_category_scores(),
+                "issues": self.issues + [f"Analysis error: {str(e)}"],
+                "wins": self.wins,
+                "details": self.details
+            }
 
     def _fetch_website(self):
         if not self.website_url:
