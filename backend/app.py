@@ -7,7 +7,8 @@ import datetime
 import re
 import time
 import jwt
-from fastapi import FastAPI, HTTPException, Header, Request, Depends
+from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi.responses import JSONResponse, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -56,6 +57,17 @@ async def security_headers(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
+
+# Global exception handler for debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    print(f"Unhandled exception: {exc}")
+    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
 
 # ── Rate Limiter ──
 
