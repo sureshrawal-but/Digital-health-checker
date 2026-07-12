@@ -28,43 +28,51 @@ class DigitalHealthChecker:
         try:
             if self.website_url:
                 self._fetch_website()
-        except Exception:
+        except Exception as e:
+            print(f"Fetch error: {e}")
             pass
         
         # Wrap each check in try/except to prevent one failure from breaking the whole analysis
         try:
             self.check_website_presence()
-        except Exception:
+        except Exception as e:
+            print(f"Website presence error: {e}")
             pass
         
         try:
             self.check_google_business()
-        except Exception:
+        except Exception as e:
+            print(f"Google business error: {e}")
             pass
         
         try:
             self.check_social_media()
-        except Exception:
+        except Exception as e:
+            print(f"Social media error: {e}")
             pass
         
         try:
             self.check_mobile_friendly()
-        except Exception:
+        except Exception as e:
+            print(f"Mobile friendly error: {e}")
             pass
         
         try:
             self.check_online_reviews()
-        except Exception:
+        except Exception as e:
+            print(f"Online reviews error: {e}")
             pass
         
         try:
             self.check_seo_basics()
-        except Exception:
+        except Exception as e:
+            print(f"SEO basics error: {e}")
             pass
         
         try:
             self.check_contact_accessibility()
-        except Exception:
+        except Exception as e:
+            print(f"Contact accessibility error: {e}")
             pass
         
         self.calculate_total()
