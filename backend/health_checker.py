@@ -87,12 +87,15 @@ class DigitalHealthChecker:
             score += 4
             details['ssl'] = True
             self.wins.append("✅ SSL certificate present (HTTPS)")
-            ssl_info = self._check_ssl_details()
-            details['ssl_details'] = ssl_info
-            if ssl_info.get('valid'):
-                self.wins.append(f"✅ SSL valid until {ssl_info.get('expiry', 'unknown')}")
-            else:
-                self.issues.append("⚠️ SSL certificate issue: " + ssl_info.get('error', 'unknown'))
+            try:
+                ssl_info = self._check_ssl_details()
+                details['ssl_details'] = ssl_info
+                if ssl_info.get('valid'):
+                    self.wins.append(f"✅ SSL valid until {ssl_info.get('expiry', 'unknown')}")
+                else:
+                    self.issues.append("⚠️ SSL certificate issue: " + ssl_info.get('error', 'unknown'))
+            except Exception:
+                pass
         else:
             self.issues.append("⚠️ Website not using HTTPS (security risk)")
 
@@ -115,24 +118,31 @@ class DigitalHealthChecker:
 
         security_headers = self._check_security_headers()
         details['security_headers'] = security_headers
-        if security_headers.get('score', 0) >= 4:
-            score += 1
-            self.wins.append("✅ Good security headers")
-        elif security_headers.get('score', 0) > 0:
-            self.issues.append("⚠️ Some security headers missing")
+        try:
+            if security_headers.get('score', 0) >= 4:
+                score += 1
+                self.wins.append("✅ Good security headers")
+            elif security_headers.get('score', 0) > 0:
+                self.issues.append("⚠️ Some security headers missing")
+        except Exception:
+            pass
 
         tech_stack = self._detect_technology()
         details['technology'] = tech_stack
-        if tech_stack:
-            self.wins.append(f"✅ Detected: {', '.join(tech_stack[:3])}")
+        try:
+            if tech_stack:
+                self.wins.append(f"✅ Detected: {', '.join(tech_stack[:3])}")
+        except Exception:
+            pass
 
         # ── PageSpeed API for Core Web Vitals ──
-        pagespeed = self._fetch_pagespeed()
-        if pagespeed:
-            details['pagespeed'] = self._parse_pagespeed(pagespeed)
-            cwv = details['pagespeed'].get('core_web_vitals', {})
-            perf_score = details['pagespeed'].get('performance_score')
-            if cwv.get('lcp', 0) < 2.5:
+        try:
+            pagespeed = self._fetch_pagespeed()
+            if pagespeed:
+                details['pagespeed'] = self._parse_pagespeed(pagespeed)
+                cwv = details['pagespeed'].get('core_web_vitals', {})
+                perf_score = details['pagespeed'].get('performance_score')
+                if cwv.get('lcp', 0) < 2.5:
                 self.wins.append("✅ LCP (Largest Contentful Paint) < 2.5s")
             elif cwv.get('lcp'):
                 self.issues.append(f"⚠️ LCP (Largest Contentful Paint) is {cwv['lcp']}s — target < 2.5s")
@@ -155,10 +165,13 @@ class DigitalHealthChecker:
                     self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — needs improvement")
                 else:
                     self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — poor")
+        except Exception:
+            pass
 
         # ── Deep HTTP-only Analysis ──
-        perf_deep = self._deep_performance_analysis()
-        if perf_deep:
+        try:
+            perf_deep = self._deep_performance_analysis()
+            if perf_deep:
             details['deep_performance'] = perf_deep
             # Score adjustments based on deep analysis
             if perf_deep.get('resource_hints', {}).get('preload', 0) > 0:
