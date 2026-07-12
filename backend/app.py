@@ -423,6 +423,11 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
+@app.get("/debug/test-simple")
+def debug_test_simple():
+    """Simple test endpoint"""
+    return {"status": "ok", "message": "Debug endpoint works"}
+
 @app.get("/debug/test-checker")
 def debug_test_checker():
     """Simple test endpoint to debug checker"""
