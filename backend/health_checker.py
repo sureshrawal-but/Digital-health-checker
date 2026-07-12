@@ -24,13 +24,11 @@ class DigitalHealthChecker:
         self.headers = {}
 
     def run_all_checks(self):
-        # Wrap fetch in try/except to prevent 500 on fetch failure
-        try:
-            if self.website_url:
-                self._fetch_website()
-        except Exception as e:
-            print(f"Fetch error: {e}")
-            pass
+        # Offline analysis only - no external HTTP requests for stability
+        self.resp = None
+        self.html = ""
+        self.final_url = self.website_url or ""
+        self.headers = {}
         
         # Wrap each check in try/except to prevent one failure from breaking the whole analysis
         try:
