@@ -441,6 +441,11 @@ def debug_test_checker():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
 
+@app.get("/debug/simple")
+def debug_simple():
+    """Simple test endpoint"""
+    return {"success": True, "message": "Debug endpoint works"}
+
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
