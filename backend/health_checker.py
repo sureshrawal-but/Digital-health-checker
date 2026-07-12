@@ -166,40 +166,7 @@ class DigitalHealthChecker:
         try:
             if tech_stack:
                 self.wins.append(f"✅ Detected: {', '.join(tech_stack[:3])}")
-        except Exception:
-            pass
-
-        # ── PageSpeed API for Core Web Vitals ──
-        try:
-            pagespeed = self._fetch_pagespeed()
-            if pagespeed:
-                details['pagespeed'] = self._parse_pagespeed(pagespeed)
-                cwv = details['pagespeed'].get('core_web_vitals', {})
-                perf_score = details['pagespeed'].get('performance_score')
-                if cwv.get('lcp', 0) < 2.5:
-                    self.wins.append("✅ LCP (Largest Contentful Paint) < 2.5s")
-            elif cwv.get('lcp'):
-                self.issues.append(f"⚠️ LCP (Largest Contentful Paint) is {cwv['lcp']}s — target < 2.5s")
-            if cwv.get('cls', 1) < 0.1:
-                self.wins.append("✅ CLS (Cumulative Layout Shift) < 0.1")
-            elif cwv.get('cls'):
-                self.issues.append(f"⚠️ CLS (Cumulative Layout Shift) is {cwv['cls']} — target < 0.1")
-            if cwv.get('fid', 0) < 100:
-                self.wins.append("✅ FID (First Input Delay) < 100ms")
-            elif cwv.get('fid'):
-                self.issues.append(f"⚠️ FID (First Input Delay) is {cwv['fid']}ms — target < 100ms")
-            if cwv.get('inp', 0) < 200:
-                self.wins.append("✅ INP (Interaction to Next Paint) < 200ms")
-            elif cwv.get('inp'):
-                self.issues.append(f"⚠️ INP (Interaction to Next Paint) is {cwv['inp']}ms — target < 200ms")
-            if perf_score is not None:
-                if perf_score >= 90:
-                    self.wins.append(f"✅ PageSpeed Performance: {int(perf_score)}/100")
-                elif perf_score >= 50:
-                    self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — needs improvement")
-                else:
-                    self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — poor")
-        except Exception:
+except Exception:
             pass
 
         # ── Deep HTTP-only Analysis ──
@@ -317,44 +284,6 @@ class DigitalHealthChecker:
         except Exception as e:
             return {'valid': False, 'error': str(e)}
         return {'valid': False, 'error': 'unknown'}
-
-    def _fetch_pagespeed(self, strategy='mobile'):
-        """Fetch PageSpeed Insights data for the website."""
-        # API key not configured - skip external API call
-        return None
-
-    def _parse_pagespeed(self, data):
-        """Parse PageSpeed Insights response into readable metrics."""
-        try:
-            lighthouse = data.get('lighthouseResult', {})
-            categories = lighthouse.get('categories', {})
-            audits = lighthouse.get('audits', {})
-            
-            metrics = {}
-            metric_map = {
-                'largest-contentful-paint': 'lcp',
-                'first-input-delay': 'fid',
-                'cumulative-layout-shift': 'cls',
-                'interaction-to-next-paint': 'inp',
-                'first-contentful-paint': 'fcp',
-                'speed-index': 'si',
-                'total-blocking-time': 'tbt'
-            }
-            for key, name in metric_map.items():
-                audit = audits.get(key, {})
-                if 'numericValue' in audit:
-                    metrics[name] = round(audit['numericValue'] / 1000, 2) if key in ['largest-contentful-paint', 'first-input-delay', 'interaction-to-next-paint', 'first-contentful-paint', 'speed-index', 'total-blocking-time'] else round(audit['numericValue'], 3)
-            
-            return {
-                'performance_score': categories.get('performance', {}).get('score', 0) * 100,
-                'accessibility_score': categories.get('accessibility', {}).get('score', 0) * 100,
-                'best_practices_score': categories.get('best-practices', {}).get('score', 0) * 100,
-                'seo_score': categories.get('seo', {}).get('score', 0) * 100,
-                'core_web_vitals': metrics,
-                'url': data.get('id', '')
-            }
-        except Exception:
-            return {}
 
     def _check_security_headers(self):
         headers = self.headers
@@ -1095,20 +1024,6 @@ class DigitalHealthChecker:
         estimates['fid_likelihood'] = 'good' if len(fid_factors) >= 2 else 'needs_improvement' if fid_factors else 'poor'
         
         return estimates
-                    channel_id = items[0]['snippet']['channelId']
-                    # Get channel stats
-                    stats_url = "https://www.googleapis.com/youtube/v3/channels"
-                    stats_params = {
-                        'part': 'statistics,snippet,brandingSettings',
-                        'id': channel_id,
-                        'key': YOUTUBE_API_KEY
-                    }
-                    stats_resp = requests.get(stats_url, params=stats_params, timeout=15)
-                    if stats_resp.status_code == 200:
-                        return stats_resp.json().get('items', [{}])[0]
-        except Exception:
-            pass
-        return None
 
     def check_google_business(self):
         score = 0
