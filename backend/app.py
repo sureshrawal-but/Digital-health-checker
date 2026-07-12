@@ -423,6 +423,19 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
+@app.get("/debug/test-checker")
+def debug_test_checker():
+    """Simple test endpoint to debug checker"""
+    try:
+        checker = DigitalHealthChecker("Test Business", None)
+        report = checker.run_all_checks()
+        return {"success": True, "report": report}
+    except Exception as e:
+        import traceback
+        print(f"Debug checker error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
 # ── Serve static frontend files ──
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
