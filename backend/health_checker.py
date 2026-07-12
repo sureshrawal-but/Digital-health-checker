@@ -974,7 +974,7 @@ class DigitalHealthChecker:
             'freshchat': 'freshchat.com',
         }
         html_lower = self.html.lower()
-        found_chat = {k: v in html_lower for k, v in chat_widgets.items()}
+        found_chat = {k: v for k, v in chat_widgets.items() if v in html_lower}
         details['chat_widgets'] = {k: v for k, v in found_chat.items() if v}
         
         # Address components
