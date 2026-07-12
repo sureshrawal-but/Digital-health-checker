@@ -8,24 +8,6 @@ from urllib.parse import urlparse, urljoin
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ── Optional API Keys (set via environment variables) ──
-PAGESPEED_API_KEY = os.environ.get('PAGESPEED_API_KEY')
-GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY')
-FACEBOOK_ACCESS_TOKEN = os.environ.get('FACEBOOK_ACCESS_TOKEN')
-INSTAGRAM_ACCESS_TOKEN = os.environ.get('INSTAGRAM_ACCESS_TOKEN')
-TWITTER_BEARER_TOKEN = os.environ.get('TWITTER_BEARER_TOKEN')
-LINKEDIN_ACCESS_TOKEN = os.environ.get('LINKEDIN_ACCESS_TOKEN')
-YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
-
-# Optional API keys (set via environment variables)
-PAGESPEED_API_KEY = os.environ.get("PAGESPEED_API_KEY")
-GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY")
-FACEBOOK_ACCESS_TOKEN = os.environ.get("FACEBOOK_ACCESS_TOKEN")
-INSTAGRAM_ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
-TWITTER_BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
-LINKEDIN_ACCESS_TOKEN = os.environ.get("LINKEDIN_ACCESS_TOKEN")
-YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
-
 
 class DigitalHealthChecker:
     def __init__(self, business_name, website_url=None):
@@ -166,11 +148,87 @@ class DigitalHealthChecker:
                     self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — needs improvement")
                 else:
                     self.issues.append(f"⚠️ PageSpeed Performance: {int(perf_score)}/100 — poor")
-                    self.wins.append(f"✅ PageSpeed Performance: {perf_score}/100")
-                elif perf_score >= 50:
-                    self.issues.append(f"⚠️ PageSpeed Performance: {perf_score}/100 — needs improvement")
-                else:
-                    self.issues.append(f"⚠️ PageSpeed Performance: {perf_score}/100 — poor")
+
+        # ── Deep HTTP-only Analysis ──
+        perf_deep = self._deep_performance_analysis()
+        if perf_deep:
+            details['deep_performance'] = perf_deep
+            # Score adjustments based on deep analysis
+            if perf_deep.get('resource_hints', {}).get('preload', 0) > 0:
+                self.wins.append("✅ Resource preloading detected")
+            if perf_deep.get('resource_hints', {}).get('preconnect', 0) > 0:
+                self.wins.append("✅ DNS preconnect hints present")
+            if perf_deep.get('compression') in ('gzip', 'br', 'deflate'):
+                self.wins.append(f"✅ Compression: {perf_deep['compression'].upper()}")
+            else:
+                self.issues.append("⚠️ No compression detected")
+            
+            rc = perf_deep.get('resource_counts', {})
+            if rc.get('scripts', 0) > 20:
+                self.issues.append(f"⚠️ High script count ({rc['scripts']}) — consider bundling")
+            if rc.get('stylesheets', 0) > 10:
+                self.issues.append(f"⚠️ High stylesheet count ({rc['stylesheets']}) — consider combining")
+            
+            script_load = perf_deep.get('script_loading', {})
+            if script_load.get('async', 0) + script_load.get('defer', 0) == 0:
+                self.issues.append("⚠️ No async/defer scripts — render blocking likely")
+            
+            img_opt = perf_deep.get('image_optimization', {})
+            if img_opt.get('lazy_loading', 0) > 0:
+                self.wins.append("✅ Lazy loading images detected")
+            if img_opt.get('webp', 0) > 0:
+                self.wins.append("✅ WebP images detected")
+            if img_opt.get('avif', 0) > 0:
+                self.wins.append("✅ AVIF images detected")
+            
+            if perf_deep.get('service_worker'):
+                self.wins.append("✅ Service Worker registered (offline support)")
+            if perf_deep.get('critical_css_inline'):
+                self.wins.append("✅ Critical CSS inlined")
+
+        # Core Web Vitals estimation
+        cwv_est = self._estimate_core_web_vitals()
+        if cwv_est:
+            details['core_web_vitals_estimate'] = cwv_est
+            lcp = cwv_est.get('lcp_likelihood', 'unknown')
+            cls = cwv_est.get('cls_likelihood', 'unknown')
+            fid = cwv_est.get('fid_likelihood', 'unknown')
+            if lcp == 'good':
+                self.wins.append("✅ Estimated LCP: Good")
+            elif lcp == 'poor':
+                self.issues.append("⚠️ Estimated LCP: Poor — optimize hero image/loading")
+            if cls == 'good':
+                self.wins.append("✅ Estimated CLS: Good")
+            elif cls == 'poor':
+                self.issues.append("⚠️ Estimated CLS: Poor — add dimensions to images/fonts")
+            if fid == 'good':
+                self.wins.append("✅ Estimated FID/INP: Good")
+            elif fid == 'poor':
+                self.issues.append("⚠️ Estimated FID/INP: Poor — reduce main thread blocking")
+
+        # Deep SEO analysis
+        seo_deep = self._deep_seo_analysis()
+        if seo_deep:
+            details['deep_seo'] = seo_deep
+            if seo_deep.get('title_optimal'):
+                self.wins.append("✅ Optimal title tag length")
+            if seo_deep.get('meta_desc_optimal'):
+                self.wins.append("✅ Optimal meta description length")
+            if seo_deep.get('structured_data_count', 0) > 0:
+                self.wins.append(f"✅ Structured data: {seo_deep['structured_data_count']} items ({', '.join(seo_deep.get('schema_types', [])[:3])})")
+            if seo_deep.get('images', {}).get('alt_coverage', '0%') != 'N/A':
+                alt_cov = int(seo_deep['images']['alt_coverage'].rstrip('%'))
+                if alt_cov == 100:
+                    self.wins.append("✅ All images have alt text")
+                elif alt_cov < 80:
+                    self.issues.append(f"⚠️ Image alt coverage: {alt_cov}%")
+
+        # Deep accessibility analysis
+        a11y_deep = self._deep_accessibility_analysis()
+        if a11y_deep:
+            details['deep_accessibility'] = a11y_deep
+            if a11y_deep.get('lang'):
+                self.wins.append("✅ Language attribute declared")
 
         score = min(score, 20)
         self.scores['website_presence'] = score
@@ -298,7 +356,696 @@ class DigitalHealthChecker:
             tech.append('Apache')
         return tech
 
-    # ── Optional API Integrations ──
+    # ── Deep HTTP-only Analysis (no API keys needed) ──
+
+    def _deep_performance_analysis(self):
+        """Analyze performance indicators from HTML, headers, and resource hints."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        # Resource hints
+        resource_hints = {
+            'preload': len(re.findall(r'<link[^>]+rel=["\']preload["\']', self.html, re.IGNORECASE)),
+            'prefetch': len(re.findall(r'<link[^>]+rel=["\']prefetch["\']', self.html, re.IGNORECASE)),
+            'preconnect': len(re.findall(r'<link[^>]+rel=["\']preconnect["\']', self.html, re.IGNORECASE)),
+            'dns-prefetch': len(re.findall(r'<link[^>]+rel=["\']dns-prefetch["\']', self.html, re.IGNORECASE)),
+            'prerender': len(re.findall(r'<link[^>]+rel=["\']prerender["\']', self.html, re.IGNORECASE)),
+            'modulepreload': len(re.findall(r'<link[^>]+rel=["\']modulepreload["\']', self.html, re.IGNORECASE)),
+        }
+        details['resource_hints'] = resource_hints
+        
+        # Compression
+        content_encoding = self.headers.get('Content-Encoding', '').lower()
+        details['compression'] = content_encoding if content_encoding else 'none'
+        
+        # HTTP/2 or HTTP/3
+        details['http_version'] = getattr(self.resp.raw, 'version', 11) / 10  # 1.1, 2.0, 3.0
+        
+        # Resource counts from HTML
+        script_count = len(re.findall(r'<script[^>]*>', html_lower, re.IGNORECASE))
+        css_count = len(re.findall(r'<link[^>]+rel=["\']stylesheet["\']', html_lower, re.IGNORECASE))
+        img_count = len(re.findall(r'<img[^>]*>', html_lower, re.IGNORECASE))
+        iframe_count = len(re.findall(r'<iframe[^>]*>', html_lower, re.IGNORECASE))
+        font_count = len(re.findall(r'<link[^>]+rel=["\']preload["\'][^>]+as=["\']font["\']', html_lower, re.IGNORECASE))
+        
+        details['resource_counts'] = {
+            'scripts': script_count,
+            'stylesheets': css_count,
+            'images': img_count,
+            'iframes': iframe_count,
+            'font_preloads': font_count
+        }
+        
+        # Inline scripts/styles (render-blocking)
+        inline_scripts = len(re.findall(r'<script[^>]*>(?!.*src=)', self.html, re.IGNORECASE))
+        inline_styles = len(re.findall(r'<style[^>]*>', html_lower, re.IGNORECASE))
+        details['inline_resources'] = {'scripts': inline_scripts, 'styles': inline_styles}
+        
+        # Async/defer scripts
+        async_scripts = len(re.findall(r'<script[^>]+async', html_lower, re.IGNORECASE))
+        defer_scripts = len(re.findall(r'<script[^>]+defer', html_lower, re.IGNORECASE))
+        details['script_loading'] = {'async': async_scripts, 'defer': defer_scripts}
+        
+        # Image optimization hints
+        lazy_images = len(re.findall(r'<img[^>]+loading=["\']lazy["\']', html_lower, re.IGNORECASE))
+        webp_images = len(re.findall(r'\.webp["\']', html_lower, re.IGNORECASE))
+        avif_images = len(re.findall(r'\.avif["\']', html_lower, re.IGNORECASE))
+        details['image_optimization'] = {
+            'lazy_loading': lazy_images,
+            'webp': webp_images,
+            'avif': avif_images,
+            'total': img_count
+        }
+        
+        # Critical CSS inlining
+        critical_css_inline = bool(re.search(r'<style[^>]*>.*?@media', self.html, re.DOTALL | re.IGNORECASE))
+        details['critical_css_inline'] = critical_css_inline
+        
+        # Service Worker
+        sw_reg = bool(re.search(r'navigator\.serviceWorker\.register|serviceworker\.js', html_lower))
+        details['service_worker'] = sw_reg
+        
+        # Cache headers
+        cache_control = self.headers.get('Cache-Control', '')
+        etag = self.headers.get('ETag', '')
+        last_modified = self.headers.get('Last-Modified', '')
+        details['caching'] = {
+            'cache_control': cache_control,
+            'etag': bool(etag),
+            'last_modified': bool(last_modified)
+        }
+        
+        return details
+
+    def _deep_seo_analysis(self):
+        """Deep SEO analysis from HTML and HTTP."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        # Title
+        title_match = re.search(r'<title[^>]*>(.*?)</title>', self.html, re.IGNORECASE | re.DOTALL)
+        title = title_match.group(1).strip() if title_match else ''
+        details['title'] = title
+        details['title_length'] = len(title)
+        details['title_optimal'] = 30 <= len(title) <= 60
+        
+        # Meta description
+        meta_desc = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        meta_desc_content = meta_desc.group(1).strip() if meta_desc else ''
+        details['meta_description'] = meta_desc_content
+        details['meta_desc_length'] = len(meta_desc_content)
+        details['meta_desc_optimal'] = 120 <= len(meta_desc_content) <= 160
+        
+        # Heading hierarchy
+        h1_count = len(re.findall(r'<h1[^>]*>', html_lower, re.IGNORECASE))
+        h2_count = len(re.findall(r'<h2[^>]*>', html_lower, re.IGNORECASE))
+        h3_count = len(re.findall(r'<h3[^>]*>', html_lower, re.IGNORECASE))
+        details['headings'] = {'h1': h1_count, 'h2': h2_count, 'h3': h3_count}
+        
+        # Canonical
+        canonical = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        details['canonical'] = canonical.group(1) if canonical else None
+        
+        # Open Graph
+        og_tags = {}
+        for prop in ['og:title', 'og:description', 'og:image', 'og:url', 'og:type', 'og:site_name']:
+            match = re.search(rf'<meta[^>]+property=["\']{prop}["\'][^>]+content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+            og_tags[prop] = match.group(1) if match else None
+        details['open_graph'] = {k: v for k, v in og_tags.items() if v}
+        
+        # Twitter Cards
+        twitter_tags = {}
+        for name in ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:site']:
+            match = re.search(rf'<meta[^>]+name=["\']{name}["\'][^>]+content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+            twitter_tags[name] = match.group(1) if match else None
+        details['twitter_cards'] = {k: v for k, v in twitter_tags.items() if v}
+        
+        # Structured data (JSON-LD)
+        json_ld_scripts = re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', self.html, re.IGNORECASE | re.DOTALL)
+        structured_data = []
+        for script in json_ld_scripts:
+            try:
+                parsed = json.loads(script.strip())
+                if isinstance(parsed, list):
+                    structured_data.extend(parsed)
+                else:
+                    structured_data.append(parsed)
+            except:
+                pass
+        details['structured_data'] = structured_data
+        details['structured_data_count'] = len(structured_data)
+        
+        # Schema.org types detected
+        schema_types = set()
+        for item in structured_data:
+            if isinstance(item, dict) and '@type' in item:
+                schema_types.add(item['@type'])
+            elif isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, dict) and '@type' in sub:
+                        schema_types.add(sub['@type'])
+        details['schema_types'] = list(schema_types)
+        
+        # Robots meta
+        robots = re.search(r'<meta[^>]+name=["\']robots["\'][^>]+content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        details['robots_meta'] = robots.group(1) if robots else None
+        
+        # Hreflang
+        hreflangs = re.findall(r'<link[^>]+rel=["\']alternate["\'][^>]+hreflang=["\']([^"\']+)["\'][^>]+href=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        details['hreflang'] = [{'lang': h[0], 'url': h[1]} for h in hreflangs]
+        
+        # Pagination
+        pagination = {
+            'next': bool(re.search(r'<link[^>]+rel=["\']next["\']', html_lower, re.IGNORECASE)),
+            'prev': bool(re.search(r'<link[^>]+rel=["\']prev["\']', html_lower, re.IGNORECASE)),
+            'rel_canonical_self': bool(canonical)
+        }
+        details['pagination'] = pagination
+        
+        # Internal links analysis
+        internal_links = re.findall(r'<a[^>]+href=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        internal_count = sum(1 for link in internal_links if link.startswith('/') or urlparse(link).netloc == urlparse(self.final_url).netloc)
+        external_count = len(internal_links) - internal_count
+        details['links'] = {'internal': internal_count, 'external': external_count, 'total': len(internal_links)}
+        
+        # Images with alt text
+        img_tags = re.findall(r'<img[^>]*>', html_lower, re.IGNORECASE)
+        imgs_with_alt = sum(1 for img in img_tags if 'alt=' in img)
+        details['images'] = {'total': len(img_tags), 'with_alt': imgs_with_alt, 'alt_coverage': f'{round(imgs_with_alt/len(img_tags)*100) if img_tags else 0}%' if img_tags else 'N/A'}
+        
+        return details
+
+    def _deep_accessibility_analysis(self):
+        """Basic accessibility indicators from HTML."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        # Lang attribute
+        lang_match = re.search(r'<html[^>]+lang=["\']([^"\']+)["\']', html_lower, re.IGNORECASE)
+        details['lang'] = lang_match.group(1) if lang_match else None
+        
+        # ARIA landmarks
+        landmarks = {
+            'banner': 'role="banner"' in html_lower,
+            'navigation': 'role="navigation"' in html_lower,
+            'main': 'role="main"' in html_lower,
+            'complementary': 'role="complementary"' in html_lower,
+            'contentinfo': 'role="contentinfo"' in html_lower,
+            'search': 'role="search"' in html_lower,
+            'form': 'role="form"' in html_lower,
+        }
+        details['aria_landmarks'] = landmarks
+        
+        # Semantic HTML5 elements
+        semantic = {
+            'header': '<header' in html_lower,
+            'nav': '<nav' in html_lower,
+            'main': '<main' in html_lower,
+            'article': '<article' in html_lower,
+            'section': '<section' in html_lower,
+            'aside': '<aside' in html_lower,
+            'footer': '<footer' in html_lower,
+            'figure': '<figure' in html_lower,
+            'figcaption': '<figcaption' in html_lower,
+            'time': '<time' in html_lower,
+        }
+        details['semantic_elements'] = semantic
+        
+        # Form labels
+        inputs = re.findall(r'<input[^>]*>', self.html, re.IGNORECASE)
+        inputs_with_labels = 0
+        for inp in inputs:
+            inp_id = re.search(r'id=["\']([^"\']+)["\']', inp)
+            if inp_id and f'for="{inp_id.group(1)}"' in self.html:
+                inputs_with_labels += 1
+            elif 'aria-label' in inp or 'aria-labelledby' in inp:
+                inputs_with_labels += 1
+        details['form_labels'] = {'total_inputs': len(inputs), 'labeled': inputs_with_labels}
+        
+        # Skip links
+        details['skip_link'] = 'skip to main' in html_lower or 'skip to content' in html_lower
+        
+        # Focus indicators (CSS outline: none detection)
+        details['focus_outline_removed'] = 'outline: none' in self.html.lower() or 'outline:none' in self.html.lower()
+        
+        return details
+
+    def _deep_security_analysis(self):
+        """Extended security analysis."""
+        if not self.resp:
+            return {}
+        
+        details = {}
+        headers = self.headers
+        html_lower = self.html.lower()
+        
+        # Extended security headers
+        sec_headers = {
+            'cross_origin_embedder_policy': headers.get('Cross-Origin-Embedder-Policy'),
+            'cross_origin_opener_policy': headers.get('Cross-Origin-Opener-Policy'),
+            'cross_origin_resource_policy': headers.get('Cross-Origin-Resource-Policy'),
+            'expect_ct': headers.get('Expect-CT'),
+            'report_to': headers.get('Report-To'),
+            'nel': headers.get('NEL'),
+        }
+        details['extended_headers'] = {k: v for k, v in sec_headers.items() if v}
+        
+        # CSP analysis
+        csp = headers.get('Content-Security-Policy', '')
+        if csp:
+            details['csp_directives'] = [d.strip() for d in csp.split(';') if d.strip()]
+            details['csp_has_report_uri'] = 'report-uri' in csp or 'report-to' in csp
+            details['csp_unsafe_inline'] = "'unsafe-inline'" in csp
+            details['csp_unsafe_eval'] = "'unsafe-eval'" in csp
+        
+        # Cookie security
+        cookies = headers.get('Set-Cookie', '')
+        if cookies:
+            cookie_list = cookies.split(',')
+            secure_count = sum(1 for c in cookie_list if 'secure' in c.lower())
+            httponly_count = sum(1 for c in cookie_list if 'httponly' in c.lower())
+            samesite_count = sum(1 for c in cookie_list if 'samesite' in c.lower())
+            details['cookie_security'] = {
+                'total': len(cookie_list),
+                'secure': secure_count,
+                'httponly': httponly_count,
+                'samesite': samesite_count
+            }
+        
+        # Mixed content detection
+        mixed_content = bool(re.search(r'src=["\']http://|href=["\']http://', self.html))
+        details['mixed_content_detected'] = mixed_content
+        
+        # Form action HTTPS
+        form_actions = re.findall(r'<form[^>]+action=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        insecure_forms = sum(1 for a in form_actions if a.startswith('http://'))
+        details['insecure_form_actions'] = insecure_forms
+        
+        # X-Powered-By exposure
+        details['powered_by_exposed'] = bool(headers.get('X-Powered-By'))
+        
+        # Server header exposure
+        details['server_exposed'] = bool(headers.get('Server'))
+        
+        return details
+
+    def _deep_google_business_analysis(self):
+        """Deeper GBP detection from HTML, structured data, and public endpoints."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        # Check for Google Maps embed
+        maps_embeds = len(re.findall(r'google\.com/maps/embed|maps\.google\.com', html_lower))
+        details['maps_embeds'] = maps_embeds
+        
+        # Check for Google Business schema
+        gbp_schema = False
+        json_ld_scripts = re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', self.html, re.IGNORECASE | re.DOTALL)
+        for script in json_ld_scripts:
+            try:
+                parsed = json.loads(script.strip())
+                items = parsed if isinstance(parsed, list) else [parsed]
+                for item in items:
+                    if isinstance(item, dict):
+                        if item.get('@type') in ['LocalBusiness', 'Store', 'Restaurant', 'Organization']:
+                            gbp_schema = True
+                            details['local_business_schema'] = item.get('@type')
+            except:
+                pass
+        details['gbp_schema_detected'] = gbp_schema
+        
+        # Check for place ID in URL
+        place_id_match = re.search(r'place_id=([^&"\']+)', html_lower)
+        details['place_id'] = place_id_match.group(1) if place_id_match else None
+        
+        # Check for Google Maps API key
+        maps_key = bool(re.search(r'ai[zs]a[^"\']{30,}', html_lower))
+        details['maps_api_key_exposed'] = maps_key
+        
+        # Check for review markup
+        review_schema = False
+        for script in re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', self.html, re.IGNORECASE | re.DOTALL):
+            try:
+                parsed = json.loads(script.strip())
+                items = parsed if isinstance(parsed, list) else [parsed]
+                for item in items:
+                    if isinstance(item, dict) and item.get('@type') in ['Review', 'AggregateRating']:
+                        review_schema = True
+            except:
+                pass
+        details['review_schema'] = review_schema
+        
+        # Check for address in structured format
+        address_found = any(k in html_lower for k in ['streetaddress', 'addresslocality', 'addressregion', 'postalcode'])
+        details['structured_address'] = address_found
+        
+        return details
+
+    def _deep_social_media_analysis(self):
+        """Fetch public social profile data via HTTP (no API keys)."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        social_platforms = {
+            'facebook': 'facebook.com',
+            'instagram': 'instagram.com',
+            'twitter': 'twitter.com',
+            'x': 'x.com',
+            'linkedin': 'linkedin.com',
+            'youtube': 'youtube.com',
+            'tiktok': 'tiktok.com',
+            'pinterest': 'pinterest.com',
+            'threads': 'threads.net'
+        }
+        
+        found = {}
+        for platform, domain in social_platforms.items():
+            # Check for links on website
+            pattern = rf'href=["\']https?://(?:www\.)?{re.escape(domain)}/([^"\'>\s]+)'
+            matches = re.findall(pattern, self.html, re.IGNORECASE)
+            if matches:
+                found[platform] = matches[0]
+        
+        details['profile_links'] = found
+        
+        # Try to fetch public profile pages for follower counts (best effort)
+        # This is limited and may be blocked, but we try
+        for platform, username in found.items():
+            if platform == 'facebook':
+                count = self._fetch_facebook_followers(username)
+            elif platform == 'instagram':
+                count = self._fetch_instagram_followers(username)
+            elif platform in ('twitter', 'x'):
+                count = self._fetch_twitter_followers(username)
+            elif platform == 'linkedin':
+                count = self._fetch_linkedin_followers(username)
+            elif platform == 'youtube':
+                count = self._fetch_youtube_subscribers(username)
+            else:
+                count = None
+            
+            if count:
+                details[f'{platform}_followers'] = count
+        
+        return details
+
+    def _fetch_facebook_followers(self, username):
+        """Try to get Facebook page likes from public page."""
+        try:
+            # Very limited - public page may require auth
+            resp = requests.get(f'https://www.facebook.com/{username}', timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            # Facebook heavily blocks scraping - just return None
+            return None
+        except:
+            return None
+
+    def _fetch_instagram_followers(self, username):
+        """Try to get Instagram follower count from public profile."""
+        try:
+            resp = requests.get(f'https://www.instagram.com/{username}/', timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            if resp.status_code == 200:
+                match = re.search(r'"edge_followed_by":{"count":(\d+)}', resp.text)
+                if match:
+                    return int(match.group(1))
+        except:
+            pass
+        return None
+
+    def _fetch_twitter_followers(self, username):
+        """Try to get Twitter/X follower count from public profile."""
+        try:
+            resp = requests.get(f'https://twitter.com/{username}', timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            if resp.status_code == 200:
+                # Twitter uses dynamic loading - hard to scrape
+                match = re.search(r'followers_count[=:]"?(\d+)"?', resp.text)
+                if match:
+                    return int(match.group(1))
+        except:
+            pass
+        return None
+
+    def _fetch_linkedin_followers(self, username):
+        """Try to get LinkedIn follower count."""
+        try:
+            resp = requests.get(f'https://www.linkedin.com/company/{username}/', timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            if resp.status_code == 200:
+                match = re.search(r'followers[^>]*>(\d[\d,]*)', resp.text, re.IGNORECASE)
+                if match:
+                    return int(match.group(1).replace(',', ''))
+        except:
+            pass
+        return None
+
+    def _fetch_youtube_subscribers(self, username):
+        """Try to get YouTube subscriber count."""
+        try:
+            resp = requests.get(f'https://www.youtube.com/@{username}', timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            if resp.status_code == 200:
+                match = re.search(r'subscriber[s]?[^>]*>([\d,.]+)', resp.text, re.IGNORECASE)
+                if match:
+                    return int(match.group(1).replace(',', ''))
+        except:
+            pass
+        return None
+
+    def _deep_reviews_analysis(self):
+        """Deeper review platform detection."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        review_platforms = {
+            'google_reviews': ['google review', 'google reviews', 'reviews.google.com'],
+            'trustpilot': ['trustpilot', 'widget.trustpilot.com'],
+            'yelp': ['yelp.com', 'yelp review'],
+            'angie': ['angie\'s list', 'angieslist'],
+            'tripadvisor': ['tripadvisor', 'trip advisor'],
+            'facebook_reviews': ['facebook.com/reviews', 'facebook review'],
+            'g2': ['g2.com', 'g2 crowd'],
+            'capterra': ['capterra', 'capterra review'],
+            'glassdoor': ['glassdoor', 'glassdoor review'],
+            'indeed': ['indeed.com/reviews', 'indeed review'],
+            'clutch': ['clutch.co', 'clutch review'],
+            'better_business_bureau': ['bbb.org', 'better business bureau'],
+        }
+        
+        found = []
+        for platform, keywords in review_platforms.items():
+            if any(kw in html_lower for kw in keywords):
+                found.append(platform)
+        
+        details['review_platforms_detected'] = found
+        
+        # Check for review schema
+        review_schema_count = 0
+        for script in re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', self.html, re.IGNORECASE | re.DOTALL):
+            try:
+                parsed = json.loads(script.strip())
+                items = parsed if isinstance(parsed, list) else [parsed]
+                for item in items:
+                    if isinstance(item, dict) and item.get('@type') in ['Review', 'AggregateRating']:
+                        review_schema_count += 1
+            except:
+                pass
+        details['review_schema_count'] = review_schema_count
+        
+        # Testimonial/quote detection
+        testimonial_keywords = ['testimonial', 'client says', 'customer says', 'what our clients', 'what our customers']
+        details['testimonials_present'] = any(kw in html_lower for kw in testimonial_keywords)
+        
+        return details
+
+    def _deep_mobile_analysis(self):
+        """Extended mobile friendliness checks."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html_lower = self.html.lower()
+        
+        # Viewport variations
+        viewport_match = re.search(r'<meta[^>]+name=["\']viewport["\'][^>]+content=["\']([^"\']+)["\']', self.html, re.IGNORECASE)
+        if viewport_match:
+            content = viewport_match.group(1)
+            details['viewport_content'] = content
+            details['viewport_width_device'] = 'width=device-width' in content
+            details['viewport_initial_scale'] = 'initial-scale=1' in content
+            details['viewport_user_scalable'] = 'user-scalable=no' not in content
+        
+        # Touch target sizing (heuristic)
+        buttons = re.findall(r'<button[^>]*>|<a[^>]*class=["\'][^"\']*btn[^"\']*["\']', self.html, re.IGNORECASE)
+        details['button_count'] = len(buttons)
+        
+        # Font size detection
+        font_sizes = re.findall(r'font-size:\s*(\d+(?:\.\d+)?)(px|rem|em)', self.html, re.IGNORECASE)
+        small_fonts = sum(1 for size, unit in font_sizes if (unit == 'px' and float(size) < 16) or (unit in ('rem', 'em') and float(size) < 1))
+        details['potentially_small_fonts'] = small_fonts
+        
+        # Tap target spacing (heuristic)
+        details['touch_friendly_heuristic'] = len(re.findall(r'padding:\s*\d+px\s*\d+px', self.html, re.IGNORECASE)) > 0
+        
+        # Media queries count
+        details['media_queries_count'] = len(re.findall(r'@media\s*[^{]+\{', self.html, re.IGNORECASE))
+        
+        # Responsive images
+        details['picture_elements'] = len(re.findall(r'<picture[^>]*>', self.html, re.IGNORECASE))
+        details['srcset_usage'] = len(re.findall(r'srcset=["\'][^"\']+', self.html, re.IGNORECASE))
+        details['sizes_attr'] = len(re.findall(r'sizes=["\'][^"\']+', self.html, re.IGNORECASE))
+        
+        return details
+
+    def _deep_contact_analysis(self):
+        """Extended contact information detection."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        details = {}
+        html = self.html
+        
+        # Phone patterns (international)
+        phones = re.findall(r'(?:\+?\d{1,3}[\s\-]?)?(?:\(?\d{1,4}\)?[\s\-]?)?\d{3,4}[\s\-]?\d{3,4}', html)
+        details['phones'] = list(set(phones))[:5]
+        
+        # Emails
+        emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', html)
+        details['emails'] = list(set(emails))[:5]
+        
+        # Social links
+        social_links = {}
+        for platform in ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok', 'pinterest', 'whatsapp', 'telegram', 'skype']:
+            pattern = rf'href=["\']https?://(?:www\.)?{platform}\.com/([^"\'>\s]+)'
+            matches = re.findall(pattern, html, re.IGNORECASE)
+            if matches:
+                social_links[platform] = matches[0]
+        details['social_links'] = social_links
+        
+        # Contact form
+        details['contact_form'] = '<form' in html.lower() and ('contact' in html.lower() or 'message' in html.lower() or 'inquiry' in html.lower())
+        
+        # Chat widgets
+        chat_widgets = {
+            'tawk': 'tawk.to',
+            'interp_late.lower(),
+            'intercom': 'intercom.io',
+            'crisp': 'crisp.chat',
+            'zendesk': 'zendesk.com',
+            'drift': 'drift.com',
+            'hubspot': 'hubspot.com',
+            'freshchat': 'freshchat.com',
+        }
+        html_lower = self.html.lower()
+        found_chat = {k: v in html_lower for k, v in chat_widgets.items()}
+        details['chat_widgets'] = {k: v for k, v in found_chat.items() if v}
+        
+        # Address components
+        address_indicators = ['street', 'avenue', 'road', 'blvd', 'drive', 'lane', 'suite', 'floor', 'unit', 'building', 'plaza', 'city', 'state', 'zip', 'postal', 'country']
+        details['address_indicators'] = sum(1 for ind in address_indicators if ind in html_lower)
+        
+        # Business hours
+        hours_patterns = ['opening hours', 'business hours', 'hours of operation', 'open daily', 'mon-fri', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        details['business_hours_mentioned'] = any(p in html.lower() for p in hours_patterns)
+        
+        return details
+
+    def _estimate_core_web_vitals(self):
+        """Estimate Core Web Vitals from HTML patterns and resource hints (no API)."""
+        if not self.resp or self.resp.status_code != 200:
+            return {}
+        
+        estimates = {}
+        html = self.html
+        html_lower = html.lower()
+        
+        # LCP estimation
+        lcp_factors = []
+        
+        # Preload LCP image
+        if 'rel="preload"' in html_lower and ('as="image"' in html_lower or 'as="font"' in html_lower):
+            lcp_factors.append('lcp_preload')
+        
+        # Hero image above fold
+        hero_img = re.search(r'<img[^>]+(?:class|id)=["\'][^"\']*(?:hero|banner|main|cover|featured)[^"\']*["\']', html, re.IGNORECASE)
+        if hero_img:
+            lcp_factors.append('hero_image')
+        
+        # No render-blocking scripts in head
+        head_end = html_lower.find('</head>')
+        head_content = html_lower[:head_end] if head_end != -1 else html_lower[:5000]
+        blocking_scripts = len(re.findall(r'<script[^>]*src=["\'][^"\']+["\'][^>]*(?!async|defer)', head_content, re.IGNORECASE))
+        if blocking_scripts == 0:
+            lcp_factors.append('no_blocking_scripts')
+        
+        estimates['lcp_signals'] = lcp_factors
+        estimates['lcp_likelihood'] = 'good' if len(lcp_factors) >= 2 else 'needs_improvement' if lcp_factors else 'poor'
+        
+        # CLS estimation
+        cls_factors = []
+        
+        # Width/height on images
+        imgs_no_dim = len(re.findall(r'<img[^>]*(?!width|height)[^>]*>', html, re.IGNORECASE))
+        total_imgs = len(re.findall(r'<img[^>]*>', html, re.IGNORECASE))
+        if total_imgs > 0 and imgs_no_dim / total_imgs < 0.3:
+            cls_factors.append('image_dimensions')
+        
+        # Font display swap
+        if 'font-display: swap' in html or 'font-display: swap' in html_lower:
+            cls_factors.append('font_display_swap')
+        
+        # Preload fonts
+        if 'rel="preload"' in html_lower and 'as="font"' in html_lower:
+            cls_factors.append('font_preload')
+        
+        estimates['cls_signals'] = cls_factors
+        estimates['cls_likelihood'] = 'good' if len(cls_factors) >= 2 else 'needs_improvement' if cls_factors else 'poor'
+        
+        # FID/INP estimation
+        fid_factors = []
+        
+        # Minimal main thread blocking
+        js_size_estimate = len(re.findall(r'<script[^>]*src=', html, re.IGNORECASE))
+        if js_size_estimate < 10:
+            fid_factors.append('few_scripts')
+        
+        # Web workers
+        if 'worker.' in html_lower or 'new Worker(' in html:
+            fid_factors.append('web_workers')
+        
+        # defer/async scripts
+        async_scripts = len(re.findall(r'<script[^>]+async', html, re.IGNORECASE))
+        defer_scripts = len(re.findall(r'<script[^>]+defer', html, re.IGNORECASE))
+        total_scripts = len(re.findall(r'<script[^>]*src=', html, re.IGNORECASE))
+        if total_scripts > 0 and (async_scripts + defer_scripts) / total_scripts > 0.5:
+            fid_factors.append('deferred_scripts')
+        
+        estimates['fid_signals'] = fid_factors
+        estimates['fid_likelihood'] = 'good' if len(fid_factors) >= 2 else 'needs_improvement' if fid_factors else 'poor'
+        
+        return estimates
 
     def _get_pagespeed_metrics(self):
         """Fetch Core Web Vitals from PageSpeed Insights API."""
