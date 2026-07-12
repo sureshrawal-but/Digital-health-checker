@@ -12,6 +12,11 @@ from fastapi.responses import JSONResponse, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+
+# Test route at the very beginning
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works"}
 from pydantic import BaseModel
 from typing import Optional
 
