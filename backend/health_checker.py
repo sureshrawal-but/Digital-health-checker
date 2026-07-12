@@ -1261,6 +1261,21 @@ class DigitalHealthChecker:
         score += 2
         details['profile_possible'] = True
 
+        # ── Deep HTTP-only GBP analysis ──
+        gbp_deep = self._deep_google_business_analysis()
+        if gbp_deep:
+            details['deep_gbp'] = gbp_deep
+            if gbp_deep.get('gbp_schema_detected'):
+                self.wins.append("✅ LocalBusiness schema detected")
+            if gbp_deep.get('maps_embeds', 0) > 0:
+                self.wins.append("✅ Google Maps embed present")
+            if gbp_deep.get('review_schema'):
+                self.wins.append("✅ Review schema markup present")
+            if gbp_deep.get('structured_address'):
+                self.wins.append("✅ Structured address markup present")
+            if gbp_deep.get('maps_api_key_exposed'):
+                self.issues.append("⚠️ Google Maps API key exposed in HTML")
+
         score = min(score, 20)
         self.scores['google_business'] = score
         self.details['google_business'] = details
@@ -1402,6 +1417,21 @@ class DigitalHealthChecker:
             score += 1
             self.wins.append("✅ Strong multi-platform social presence")
 
+        if api_data:
+            details['api_data'] = api_data
+            self.wins.append(f"✅ Fetched real-time social data for {len(api_data)} platform(s)")
+
+        # ── Deep HTTP-only social analysis ──
+        social_deep = self._deep_social_media_analysis()
+        if social_deep:
+            details['deep_social'] = social_deep
+            if social_deep.get('profile_links'):
+                self.wins.append(f"✅ Social profile links: {', '.join(social_deep['profile_links'].keys())}")
+            for platform in ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube']:
+                key = f'{platform}_followers'
+                if key in social_deep and social_deep[key]:
+                    self.wins.append(f"✅ {platform.title()}: {social_deep[key]:,} followers")
+
         score = min(score, 15)
         self.scores['social_media'] = score
         self.details['social_media'] = details
@@ -1466,6 +1496,44 @@ class DigitalHealthChecker:
         if not viewport:
             score = max(0, score - 2)
 
+        # ── Deep HTTP-only mobile analysis ──
+        mobile_deep = self._deep_mobile_analysis()
+        if mobile_deep:
+            details['deep_mobile'] = mobile_deep
+            if mobile_deep.get('viewport_content'):
+                vc = mobile_deep['viewport_content']
+                if vc.get('viewport_width_device'):
+                    self.wins.append("✅ Viewport: width=device-width")
+                if vc.get('viewport_initial_scale'):
+                    self.wins.append("✅ Viewport: initial-scale=1")
+                if vc.get('viewport_user_scalable'):
+                    self.wins.append("✅ Viewport: user-scalable allowed")
+            
+            if mobile_deep.get('picture_elements', 0) > 0:
+                self.wins.append("✅ <picture> elements for responsive images")
+            if mobile_deep.get('srcset_usage', 0) > 0:
+                self.wins.append("✅ srcset for responsive images")
+            if mobile_deep.get('sizes_attr', 0) > 0:
+                self.wins.append("✅ sizes attribute on images")
+            
+            if mobile_deep.get('media_queries_count', 0) > 5:
+                self.wins.append("✅ Extensive media queries")
+            elif mobile_deep.get('media_queries_count', 0) > 0:
+                self.wins.append("✅ Media queries present")
+            else:
+                self.issues.append("⚠️ No media queries detected")
+
+            if mobile_deep.get('touch_friendly_heuristic'):
+                self.wins.append("✅ Touch-friendly spacing hints")
+
+            vp = mobile_deep.get('viewport_content', {})
+            if not vp.get('viewport_width_device'):
+                self.issues.append("⚠️ Viewport missing width=device-width")
+            if not vp.get('viewport_initial_scale'):
+                self.issues.append("⚠️ Viewport missing initial-scale=1")
+            if not vp.get('viewport_user_scalable'):
+                self.issues.append("⚠️ Viewport disables user scaling")
+
         score = min(score, 15)
         self.scores['mobile_friendly'] = score
         self.details['mobile_friendly'] = details
@@ -1507,6 +1575,19 @@ class DigitalHealthChecker:
 
         score += 2
         details['review_platforms_possible'] = True
+
+        # ── Deep HTTP-only reviews analysis ──
+        reviews_deep = self._deep_reviews_analysis()
+        if reviews_deep:
+            details['deep_reviews'] = reviews_deep
+            if reviews_deep.get('review_platforms_detected'):
+                self.wins.append(f"✅ Review platforms detected: {', '.join(reviews_deep['review_platforms_detected'])}")
+            if reviews_deep.get('review_schema_count', 0) > 0:
+                self.wins.append(f"✅ Review schema markup: {reviews_deep['review_schema_count']} items")
+            if reviews_deep.get('testimonials_present'):
+                self.wins.append("✅ Testimonials section present")
+            if not reviews_deep.get('review_platforms_detected') and not reviews_deep.get('testimonials_present'):
+                self.issues.append("⚠️ No review platforms or testimonials detected")
 
         score = min(score, 10)
         self.scores['online_reviews'] = score
@@ -1605,6 +1686,24 @@ class DigitalHealthChecker:
             self.wins.append("✅ Structured data (Schema.org) detected")
 
         score = min(score, 10)
+
+        # ── Deep SEO analysis ──
+        seo_deep = self._deep_seo_analysis()
+        if seo_deep:
+            details['deep_seo'] = seo_deep
+            if seo_deep.get('title_optimal'):
+                self.wins.append("✅ Optimal title tag length")
+            if seo_deep.get('meta_desc_optimal'):
+                self.wins.append("✅ Optimal meta description length")
+            if seo_deep.get('structured_data_count', 0) > 0:
+                self.wins.append(f"✅ Structured data: {seo_deep['structured_data_count']} items ({', '.join(seo_deep.get('schema_types', [])[:3])})")
+            if seo_deep.get('images', {}).get('alt_coverage', '0%') != 'N/A':
+                alt_cov = int(seo_deep['images']['alt_coverage'].rstrip('%'))
+                if alt_cov == 100:
+                    self.wins.append("✅ All images have alt text")
+                elif alt_cov < 80:
+                    self.issues.append(f"⚠️ Image alt coverage: {alt_cov}%")
+
         self.scores['seo_basics'] = score
         self.details['seo_basics'] = details
         return score
@@ -1695,6 +1794,25 @@ class DigitalHealthChecker:
 
         details['found'] = found_contacts
         details['contact_methods_count'] = len(found_contacts)
+
+        # ── Deep HTTP-only contact analysis ──
+        contact_deep = self._deep_contact_analysis()
+        if contact_deep:
+            details['deep_contact'] = contact_deep
+            if contact_deep.get('phones'):
+                self.wins.append(f"✅ Phone numbers: {', '.join(contact_deep['phones'][:3])}")
+            if contact_deep.get('emails'):
+                self.wins.append(f"✅ Email addresses: {', '.join(contact_deep['emails'][:3])}")
+            if contact_deep.get('social_links'):
+                self.wins.append(f"✅ Social links: {', '.join(contact_deep['social_links'].keys())}")
+            if contact_deep.get('chat_widgets'):
+                self.wins.append(f"✅ Chat widgets: {', '.join(contact_deep['chat_widgets'].keys())}")
+            if contact_deep.get('address_indicators', 0) > 3:
+                self.wins.append("✅ Detailed address information")
+            if contact_deep.get('business_hours_mentioned'):
+                self.wins.append("✅ Business hours mentioned")
+            if not contact_deep.get('contact_form'):
+                self.issues.append("⚠️ No contact form detected")
 
         score = min(score, 10)
         self.scores['contact_accessibility'] = score
