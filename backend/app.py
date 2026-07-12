@@ -38,7 +38,7 @@ LOGIN_LOCKOUT_MINUTES = 15
 app = FastAPI(
     title="Digital Health Checker API",
     description="Analyze and score the digital presence of any website",
-    version="2.1.0"
+    version="2.1.1"
 )
 
 app.add_middleware(
@@ -391,7 +391,7 @@ def quick_website_check(url: str):
 def health_check():
     return {
         "status": "healthy",
-        "api_version": "2.1.0"
+        "api_version": "2.1.1"
     }
 
 # ── Admin Endpoints ──
