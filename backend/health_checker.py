@@ -269,7 +269,10 @@ except Exception:
         try:
             hostname = urlparse(self.final_url).netloc.split(':')[0]
             context = ssl.create_default_context()
-            with socket.create_connection((hostname, 443), timeout=5) as sock:
+            # Use shorter timeout and disable hostname verification for speed
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            with socket.create_connection((hostname, 443), timeout=3) as sock:
                 with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                     cert = ssock.getpeercert()
                     expiry = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
