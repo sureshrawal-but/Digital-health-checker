@@ -37,6 +37,13 @@ class DigitalHealthChecker:
         return self.get_report()
 
     def _fetch_website(self):
+        if not self.website_url:
+            self.resp = None
+            self.html = ""
+            self.final_url = ""
+            self.headers = {}
+            return
+        
         url = self.website_url if self.website_url.startswith(('http://', 'https://')) else f'https://{self.website_url}'
         try:
             self.resp = requests.get(url, timeout=15, allow_redirects=True, headers={
