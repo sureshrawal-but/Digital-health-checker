@@ -950,7 +950,6 @@ class DigitalHealthChecker:
         # Chat widgets
         chat_widgets = {
             'tawk': 'tawk.to',
-            'interp_late.lower(),
             'intercom': 'intercom.io',
             'crisp': 'crisp.chat',
             'zendesk': 'zendesk.com',
