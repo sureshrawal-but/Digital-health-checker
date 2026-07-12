@@ -451,7 +451,7 @@ def debug_simple():
     """Simple test endpoint"""
     return {"success": True, "message": "Debug endpoint works"}
 
-# app.mount("/static", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# # app.mount("/static", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
