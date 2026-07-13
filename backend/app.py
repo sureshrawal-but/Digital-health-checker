@@ -500,11 +500,26 @@ def admin_searches(authorization: str = Header(None)):
 def test_route():
     return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
 
-# Root endpoint
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+# Test route for debugging
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
+
+# Serve static frontend files (JS, CSS, images)
+app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+
+# Root endpoint - serve frontend
 @app.get("/")
 def root():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
-
-if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
