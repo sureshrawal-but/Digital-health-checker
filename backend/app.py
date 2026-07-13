@@ -35,6 +35,11 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Test route for debugging
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
+
 # ── Security Headers Middleware ──
 
 @app.middleware("http")
@@ -107,6 +112,16 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Test route for debugging
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
+
+# Root endpoint - serve frontend
+@app.get("/")
+def serve_frontend():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
 # ── Security Headers Middleware ──
 
@@ -480,9 +495,15 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
-# ── Serve static frontend files ──
+# Test route for debugging
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
 
-app.mount("/static", StaticFiles(directory="../frontend", html=True), name="frontend")
+# Root endpoint
+@app.get("/")
+def root():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
 if __name__ == "__main__":
     import uvicorn
