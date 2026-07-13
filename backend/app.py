@@ -495,18 +495,13 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
-# Root endpoint
+# Root endpoint - serve frontend
 @app.get("/")
 def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
-# Static files (JS, CSS, images)
-@app.get("/static/{file_path:path}")
-async def serve_static(file_path: str):
-    file_path = os.path.join(FRONTEND_DIR, file_path)
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail="File not found")
+# Static files (JS, CSS, images) - use FastAPI's StaticFiles
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 # Test route for debugging
 @app.get("/test-route")
