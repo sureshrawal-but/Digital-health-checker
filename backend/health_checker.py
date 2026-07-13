@@ -306,15 +306,23 @@ class DigitalHealthChecker:
         return result
 
     def run_all_checks(self) -> Dict[str, Any]:
-        if self.website_url:
-            self._fetch_website()
-        self._check_website_presence()
-        self._check_google_business()
-        self._check_social_media()
-        self._check_mobile_friendly()
-        self._check_online_reviews()
-        self._check_seo_basics()
-        self._check_contact_accessibility()
+        try:
+            if self.website_url:
+                self._fetch_website()
+            self._check_website_presence()
+            self._check_google_business()
+            self._check_social_media()
+            self._check_mobile_friendly()
+            self._check_online_reviews()
+            self._check_seo_basics()
+            self._check_contact_accessibility()
+        except Exception as e:
+            for k in PILLAR_CONFIG:
+                if k not in self.scores:
+                    self.scores[k] = 0
+                if k not in self.details:
+                    self.details[k] = {}
+            self.issues.append(f"Analysis error: {str(e)}")
         total_score = sum(self.scores.values())
         health_status = self.get_health_status(total_score)
         return {
