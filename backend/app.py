@@ -7,38 +7,23 @@ import datetime
 import re
 import time
 import jwt
-from fastapi import FastAPI, HTTPException, Header, Request
-from fastapi.responses import JSONResponse, Depends
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-
-# Test route at the very beginning
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works"}
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-# Ensure backend/ is on sys.path so health_checker imports work from any CWD
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BACKEND_DIR not in sys.path:
-    sys.path.insert(0, _BACKEND_DIR)
-
-from health_checker import DigitalHealthChecker
-
-USERS_FILE = os.path.join(_BACKEND_DIR, "users.json")
-JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
-TOKEN_EXPIRY_DAYS = 7
-MAX_LOGIN_ATTEMPTS = 5
-LOGIN_LOCKOUT_MINUTES = 15
+# Import the health checker
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from health_checker import DigitalHealthChecker, analyze_business
 
 # ── App ──
 
 app = FastAPI(
     title="Digital Health Checker API",
     description="Analyze and score the digital presence of any website",
-    version="2.1.1"
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -63,17 +48,6 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
-# Global exception handler for debugging
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
-    print(f"Unhandled exception: {exc}")
-    print(traceback.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}"}
-    )
-
 # ── Rate Limiter ──
 
 login_attempts = {}
@@ -82,7 +56,6 @@ def check_rate_limit(identifier: str):
     now = time.time()
     if identifier in login_attempts:
         attempts = login_attempts[identifier]
-        # Clean old entries
         attempts = [t for t in attempts if now - t < LOGIN_LOCKOUT_MINUTES * 60]
         if len(attempts) >= MAX_LOGIN_ATTEMPTS:
             retry_after = int(LOGIN_LOCKOUT_MINUTES * 60 - (now - attempts[0]))
@@ -98,8 +71,81 @@ def record_attempt(identifier: str):
     if identifier not in login_attempts:
         login_attempts[identifier] = []
     login_attempts[identifier].append(time.time())
-    # Keep only recent attempts
     login_attempts[identifier] = [t for t in login_attempts[identifier] if time.time() - t < LOGIN_LOCKOUT_MINUTES * 60]
+
+
+# ── Config ──
+
+USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
+JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
+TOKEN_EXPIRY_DAYS = 7
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT_MINUTES = 15
+
+# ── App ──
+
+app = FastAPI(
+    title="Digital Health Checker API",
+    description="Analyze and score the digital presence of any website",
+    version="2.1.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+# ── Security Headers Middleware ──
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+# ── Rate Limiter ──
+
+login_attempts = {}
+
+def check_rate_limit(identifier: str):
+    now = time.time()
+    if identifier in login_attempts:
+        attempts = login_attempts[identifier]
+        attempts = [t for t in attempts if now - t < LOGIN_LOCKOUT_MINUTES * 60]
+        if len(attempts) >= MAX_LOGIN_ATTEMPTS:
+            retry_after = int(LOGIN_LOCKOUT_MINUTES * 60 - (now - attempts[0]))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many login attempts. Try again in {max(1, retry_after // 60)} minutes."
+            )
+        login_attempts[identifier] = attempts
+    else:
+        login_attempts[identifier] = []
+
+def record_attempt(identifier: str):
+    if identifier not in login_attempts:
+        login_attempts[identifier] = []
+    login_attempts[identifier].append(time.time())
+    login_attempts[identifier] = [t for t in login_attempts[identifier] if time.time() - t < LOGIN_LOCKOUT_MINUTES * 60]
+
 
 # ── Input Sanitizer ──
 
@@ -111,6 +157,7 @@ def sanitize_string(value: str, max_length: int = 100) -> str:
     value = re.sub(r'[<>"\'\\;{}()]', '', value)  # strip dangerous chars
     value = value[:max_length]
     return value
+
 
 # ── Data Models ──
 
@@ -127,7 +174,8 @@ class BusinessRequest(BaseModel):
     website_url: Optional[str] = None
 
 class BatchRequest(BaseModel):
-    businesses: list[BusinessRequest]
+    businesses: List[BusinessRequest]
+
 
 # ── Password Hashing (PBKDF2 with salt) ──
 
@@ -138,14 +186,12 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, stored: str) -> bool:
     try:
-        if "$" in stored:
-            salt, pwd_hash = stored.split("$", 1)
-            computed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
-            return computed.hex() == pwd_hash
-        else:
-            return hashlib.sha256(password.encode()).hexdigest() == stored
+        salt, pwd_hash = stored.split("$", 1)
+        computed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
+        return computed.hex() == pwd_hash
     except (ValueError, AttributeError):
         return False
+
 
 # ── Password Strength ──
 
@@ -159,6 +205,7 @@ def check_password_strength(password: str) -> Optional[str]:
     if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-]', password):
         return "Password must contain at least one special character"
     return None
+
 
 # ── User Storage ──
 
@@ -215,13 +262,23 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Token expired or invalid. Please login again.")
     return payload
 
-# ── Frontend ──
-
-FRONTEND_DIR = os.path.join(_BACKEND_DIR, "..", "frontend")
+# ── Root ──
 
 @app.get("/")
-def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
+def root():
+    return {
+        "app": "Digital Health Checker",
+        "version": "2.1.0",
+        "status": "running",
+        "endpoints": {
+            "register": "POST /auth/register",
+            "login": "POST /auth/login",
+            "me": "GET /auth/me",
+            "analyze": "POST /analyze (auth required)",
+            "admin_users": "GET /admin/users (admin only)",
+            "admin_searches": "GET /admin/searches (admin only)"
+        }
+    }
 
 # ── Auth Endpoints ──
 
@@ -264,10 +321,8 @@ def login(req: LoginRequest, request: Request):
 
     if not user or not verify_password(req.password, user["password"]):
         record_attempt(client_ip)
-        # Don't reveal which field is wrong
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    # Clear attempts on success
     login_attempts.pop(client_ip, None)
 
     token = create_token(username, user["role"])
@@ -276,6 +331,7 @@ def login(req: LoginRequest, request: Request):
 @app.get("/auth/me")
 def me(current_user: dict = Depends(get_current_user)):
     return {"success": True, "username": current_user["username"], "role": current_user["role"]}
+
 
 # ── Analyze ──
 
@@ -301,7 +357,7 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
         elif score >= 40:
             report["ai_summary"] = f"🔄 {name} has significant digital gaps that need attention."
         else:
-            report["ai_summary"] = f"🚨 {name} is currently digitally invisible. Start with a Google Business Profile and social media pages."
+            report["ai_summary"] = f"🚨 {name} is currently digitally invisible. Start with a Google Business Profile and social media pages today."
 
         has_website = bool(url)
         social_platforms = report.get("details", {}).get("social_media", {}).get("platforms_found", [])
@@ -320,9 +376,9 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
         report["recommendations"] = recommendations
 
         roadmap = []
-        if not has_website:
+        if not has_website or report.get("issues"):
             roadmap.append({"week": 1, "task": "Create/improve website", "effort": "2-3 hours"})
-        if not has_social:
+        if not report.get("details", {}).get("social_media", {}).get("social_presence"):
             roadmap.append({"week": 1, "task": "Set up social media pages", "effort": "1-2 hours"})
         roadmap.append({"week": 2, "task": "Optimize Google Business Profile with photos & info", "effort": "1 hour"})
         roadmap.append({"week": 2, "task": "Add contact details to all platforms", "effort": "30 min"})
@@ -346,10 +402,7 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print(f"Analysis error: {e}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Analysis failed. Please try again.")
 
 @app.post("/analyze/batch")
 def analyze_batch(request: BatchRequest, authorization: str = Header(None)):
@@ -363,7 +416,7 @@ def analyze_batch(request: BatchRequest, authorization: str = Header(None)):
             report = checker.run_all_checks()
             results.append({"business": name, "success": True, "data": report})
         except Exception as e:
-            results.append({"business": name, "success": False, "error": "Processing failed"})
+            results.append({"business": biz.business_name, "success": False, "error": "Processing failed"})
     return {"success": True, "results": results}
 
 @app.get("/check-website")
@@ -374,7 +427,6 @@ def quick_website_check(url: str):
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     try:
-        import requests
         resp = requests.get(url, timeout=10, allow_redirects=True)
         return {
             "success": True,
@@ -391,7 +443,7 @@ def quick_website_check(url: str):
 def health_check():
     return {
         "status": "healthy",
-        "api_version": "2.1.1"
+        "api_version": "2.1.0"
     }
 
 # ── Admin Endpoints ──
@@ -428,30 +480,9 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
-@app.get("/debug/test-simple")
-def debug_test_simple():
-    """Simple test endpoint"""
-    return {"status": "ok", "message": "Debug endpoint works"}
+# ── Serve static frontend files ──
 
-@app.get("/debug/test-checker")
-def debug_test_checker():
-    """Simple test endpoint to debug checker"""
-    try:
-        checker = DigitalHealthChecker("Test Business", None)
-        report = checker.run_all_checks()
-        return {"success": True, "report": report}
-    except Exception as e:
-        import traceback
-        print(f"Debug checker error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
-
-@app.get("/debug/simple")
-def debug_simple():
-    """Simple test endpoint"""
-    return {"success": True, "message": "Debug endpoint works"}
-
-# # app.mount("/static", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
