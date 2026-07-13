@@ -122,10 +122,35 @@ def check_password_strength(password: str) -> Optional[str]:
         return "Password must contain at least one special character"
     return None
 
+_in_memory_users = None
+
 def load_users():
-    if not os.path.exists(USERS_FILE):
+    global _in_memory_users
+    if _in_memory_users is not None:
+        return _in_memory_users
+    try:
+        if not os.path.exists(USERS_FILE):
+            default_admin_pwd = hash_password("Suresh@9848")
+            _in_memory_users = {
+                "Suresh": {
+                    "password": default_admin_pwd,
+                    "role": "admin",
+                    "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "searches": []
+                }
+            }
+            try:
+                with open(USERS_FILE, "w") as f:
+                    json.dump(_in_memory_users, f, indent=2)
+            except (OSError, PermissionError):
+                pass
+            return _in_memory_users
+        with open(USERS_FILE, "r") as f:
+            _in_memory_users = json.load(f)
+        return _in_memory_users
+    except (OSError, PermissionError):
         default_admin_pwd = hash_password("Suresh@9848")
-        default = {
+        _in_memory_users = {
             "Suresh": {
                 "password": default_admin_pwd,
                 "role": "admin",
@@ -133,15 +158,16 @@ def load_users():
                 "searches": []
             }
         }
-        with open(USERS_FILE, "w") as f:
-            json.dump(default, f, indent=2)
-        return default
-    with open(USERS_FILE, "r") as f:
-        return json.load(f)
+        return _in_memory_users
 
 def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=2)
+    global _in_memory_users
+    _in_memory_users = users
+    try:
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, indent=2)
+    except (OSError, PermissionError):
+        pass
 
 def create_token(username, role):
     jti = secrets.token_hex(16)
