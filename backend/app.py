@@ -246,66 +246,72 @@ def me(current_user: dict = Depends(get_current_user)):
 
 @app.post("/analyze")
 def analyze_business_endpoint(request: BusinessRequest, authorization: str = Header(None)):
+    current_user = None
     try:
         current_user = get_current_user(authorization)
-        name = sanitize_string(request.business_name, 80)
-        url = sanitize_string(request.website_url, 200) if request.website_url else None
-        if not name:
-            raise HTTPException(status_code=400, detail="Business name is required")
-        checker = DigitalHealthChecker(name, url)
-        report = checker.run_all_checks()
-        report["live_checks"] = True
-        score = report["total_score"]
-        if score >= 80:
-            report["ai_summary"] = f"✨ {name} has a strong digital foundation!"
-        elif score >= 60:
-            report["ai_summary"] = f"📈 {name} is on the right track but has room to grow."
-        elif score >= 40:
-            report["ai_summary"] = f"🔄 {name} has significant digital gaps that need attention."
-        else:
-            report["ai_summary"] = f"🚨 {name} is currently digitally invisible. Start with a Google Business Profile and social media pages today."
-        has_website = bool(url)
-        social_platforms = report.get("details", {}).get("social_media", {}).get("platforms_found", [])
-        has_social = len(social_platforms) > 0
-        recommendations = []
-        if not has_website:
-            recommendations.append({"priority": "Critical", "action": "Create a website (use platforms like Wix, WordPress, or Squarespace)", "impact": "Opens your business to 24/7 global discovery", "cost": "Free – $20/month"})
-        if not has_social:
-            recommendations.append({"priority": "High", "action": "Create social media business pages (Facebook, Instagram, LinkedIn)", "impact": "Reach billions of potential customers worldwide", "cost": "Free"})
-        recommendations.append({"priority": "High", "action": "Claim and optimize your Google Business Profile", "impact": "Show up in Google Maps and local search results", "cost": "Free"})
-        recommendations.append({"priority": "Medium", "action": "Add contact information (phone, email, WhatsApp) to all platforms", "impact": "Makes it easy for customers to reach you", "cost": "Free"})
-        if report.get("issues"):
-            recommendations.append({"priority": "Medium", "action": "Address the issues listed below to improve your digital presence", "impact": "Improves customer trust and conversion rates", "cost": "Varies"})
-        recommendations.append({"priority": "Maintenance", "action": "Ask satisfied customers to leave reviews on Google and social media", "impact": "Builds social proof and improves search ranking", "cost": "Free"})
-        report["recommendations"] = recommendations
-        roadmap = []
-        if not has_website or report.get("issues"):
-            roadmap.append({"week": 1, "task": "Create/improve website", "effort": "2-3 hours"})
-        if not report.get("details", {}).get("social_media", {}).get("social_presence"):
-            roadmap.append({"week": 1, "task": "Set up social media pages", "effort": "1-2 hours"})
-        roadmap.append({"week": 2, "task": "Optimize Google Business Profile with photos & info", "effort": "1 hour"})
-        roadmap.append({"week": 2, "task": "Add contact details to all platforms", "effort": "30 min"})
-        roadmap.append({"week": 3, "task": "Collect reviews from existing customers", "effort": "1 hour"})
-        roadmap.append({"week": 4, "task": "Review progress and re-check digital health score", "effort": "30 min"})
-        report["roadmap"] = roadmap
-        users = load_users()
-        if current_user["username"] in users:
-            search_entry = {
-                "business": name,
-                "url": url,
-                "score": score,
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-            }
-            users[current_user["username"]]["searches"].append(search_entry)
-            save_users(users)
-        return {"success": True, "data": report}
     except HTTPException:
         raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Authentication failed")
+    name = sanitize_string(request.business_name, 80)
+    url = sanitize_string(request.website_url, 200) if request.website_url else None
+    if not name:
+        raise HTTPException(status_code=400, detail="Business name is required")
+    try:
+        checker = DigitalHealthChecker(name, url)
+        report = checker.run_all_checks()
     except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        print(f"ANALYZE ERROR: {e}\n{tb}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
+        report = generate_demo_report(name, url)
+        report["live_checks"] = False
+    report["live_checks"] = report.get("live_checks", True)
+    score = report.get("total_score", 0)
+    if score >= 80:
+        report["ai_summary"] = report.get("ai_summary", f"✨ {name} has a strong digital foundation!")
+    elif score >= 60:
+        report["ai_summary"] = report.get("ai_summary", f"📈 {name} is on the right track but has room to grow.")
+    elif score >= 40:
+        report["ai_summary"] = report.get("ai_summary", f"🔄 {name} has significant digital gaps that need attention.")
+    else:
+        report["ai_summary"] = report.get("ai_summary", f"🚨 {name} is currently digitally invisible. Start with a Google Business Profile and social media pages today.")
+    has_website = bool(url)
+    social_platforms = report.get("details", {}).get("social_media", {}).get("platforms_found", [])
+    has_social = len(social_platforms) > 0
+    recommendations = []
+    if not has_website:
+        recommendations.append({"priority": "Critical", "action": "Create a website (use platforms like Wix, WordPress, or Squarespace)", "impact": "Opens your business to 24/7 global discovery", "cost": "Free – $20/month"})
+    if not has_social:
+        recommendations.append({"priority": "High", "action": "Create social media business pages (Facebook, Instagram, LinkedIn)", "impact": "Reach billions of potential customers worldwide", "cost": "Free"})
+    recommendations.append({"priority": "High", "action": "Claim and optimize your Google Business Profile", "impact": "Show up in Google Maps and local search results", "cost": "Free"})
+    recommendations.append({"priority": "Medium", "action": "Add contact information (phone, email, WhatsApp) to all platforms", "impact": "Makes it easy for customers to reach you", "cost": "Free"})
+    if report.get("issues"):
+        recommendations.append({"priority": "Medium", "action": "Address the issues listed below to improve your digital presence", "impact": "Improves customer trust and conversion rates", "cost": "Varies"})
+    recommendations.append({"priority": "Maintenance", "action": "Ask satisfied customers to leave reviews on Google and social media", "impact": "Builds social proof and improves search ranking", "cost": "Free"})
+    report["recommendations"] = report.get("recommendations", []) + recommendations
+    roadmap = report.get("roadmap", [])
+    if not has_website or report.get("issues"):
+        roadmap.insert(0, {"week": 1, "task": "Create/improve website", "effort": "2-3 hours"})
+    if not report.get("details", {}).get("social_media", {}).get("social_presence"):
+        roadmap.insert(0, {"week": 1, "task": "Set up social media pages", "effort": "1-2 hours"})
+    seen_tasks = set()
+    unique_roadmap = []
+    for r in roadmap:
+        if r["task"] not in seen_tasks:
+            seen_tasks.add(r["task"])
+            unique_roadmap.append(r)
+    report["roadmap"] = unique_roadmap
+    if current_user:
+        try:
+            users = load_users()
+            username = current_user.get("username")
+            if username and username in users:
+                users[username]["searches"].append({
+                    "business": name, "url": url, "score": score,
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                })
+                save_users(users)
+        except Exception:
+            pass
+    return {"success": True, "data": report}
 
 @app.post("/analyze/batch")
 def analyze_batch(request: BatchRequest, authorization: str = Header(None)):
