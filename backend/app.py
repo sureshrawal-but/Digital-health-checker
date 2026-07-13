@@ -318,7 +318,7 @@ def quick_website_check(url: str):
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "api_version": "2.1.0"}
+    return {"status": "healthy", "api_version": "2.1.0", "commit": "b938546"}
 
 @app.get("/admin/users")
 def admin_users(authorization: str = Header(None)):
