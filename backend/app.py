@@ -513,6 +513,15 @@ async def serve_static(file_path: str):
 def test_route():
     return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
 
+# Debug endpoint to list all routes
+@app.get("/debug/routes")
+def debug_routes():
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            routes.append({"path": route.path, "methods": list(route.methods) if hasattr(route, 'methods') else []})
+    return {"routes": routes}
+
 # Debug endpoint
 @app.get("/debug/simple")
 def debug_simple():
