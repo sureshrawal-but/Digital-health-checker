@@ -515,11 +515,16 @@ def test_route():
     return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
 
 # Serve static frontend files (JS, CSS, images)
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+@app.get("/static/{file_path:path}")
+async def serve_static(file_path: str):
+    file_path = os.path.join(FRONTEND_DIR, file_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="File not found")
 
 # Root endpoint - serve frontend
 @app.get("/")
-def root():
+def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
