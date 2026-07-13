@@ -495,26 +495,12 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
-# Test route for debugging
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
+# Root endpoint
+@app.get("/")
+def serve_frontend():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-# Test route for debugging
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
-
-# Serve static frontend files (JS, CSS, images)
+# Static files (JS, CSS, images)
 @app.get("/static/{file_path:path}")
 async def serve_static(file_path: str):
     file_path = os.path.join(FRONTEND_DIR, file_path)
@@ -522,9 +508,16 @@ async def serve_static(file_path: str):
         return FileResponse(file_path)
     raise HTTPException(status_code=404, detail="File not found")
 
-# Root endpoint - serve frontend
-@app.get("/")
-def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
+# Test route for debugging
+@app.get("/test-route")
+def test_route():
+    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
+
+# Debug endpoint
+@app.get("/debug/simple")
+def debug_simple():
+    return {"success": True, "message": "Debug endpoint works"}
+
+if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
