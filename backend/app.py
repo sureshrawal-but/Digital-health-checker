@@ -482,7 +482,7 @@ def admin_searches(authorization: str = Header(None)):
 
 # ── Serve static frontend files ──
 
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
+app.mount("/static", StaticFiles(directory="../frontend", html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
