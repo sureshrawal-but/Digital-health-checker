@@ -35,11 +35,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Test route for debugging
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
-
 # ── Security Headers Middleware ──
 
 @app.middleware("http")
@@ -500,7 +495,7 @@ def admin_searches(authorization: str = Header(None)):
 def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
-# Static files (JS, CSS, images) - use FastAPI's StaticFiles
+# Static files (JS, CSS, images) - must be mounted BEFORE catch-all routes
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 # Test route for debugging
