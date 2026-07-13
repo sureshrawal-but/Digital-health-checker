@@ -276,7 +276,10 @@ def analyze_business_endpoint(request: BusinessRequest, authorization: str = Hea
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"ANALYZE ERROR: {e}\n{tb}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
 
 @app.post("/analyze/batch")
 def analyze_batch(request: BatchRequest, authorization: str = Header(None)):
