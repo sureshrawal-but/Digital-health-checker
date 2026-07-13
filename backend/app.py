@@ -6,6 +6,7 @@ import secrets
 import datetime
 import re
 import time
+import requests
 import jwt
 from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,11 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-# Import the health checker
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from health_checker import DigitalHealthChecker, analyze_business
-
-# ── App ──
+from health_checker import DigitalHealthChecker, generate_demo_report
 
 app = FastAPI(
     title="Digital Health Checker API",
@@ -35,8 +33,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# ── Security Headers Middleware ──
-
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -47,8 +43,6 @@ async def security_headers(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
-
-# ── Rate Limiter ──
 
 login_attempts = {}
 
@@ -73,103 +67,21 @@ def record_attempt(identifier: str):
     login_attempts[identifier].append(time.time())
     login_attempts[identifier] = [t for t in login_attempts[identifier] if time.time() - t < LOGIN_LOCKOUT_MINUTES * 60]
 
-
-# ── Config ──
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 TOKEN_EXPIRY_DAYS = 7
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_LOCKOUT_MINUTES = 15
 
-# ── App ──
-
-app = FastAPI(
-    title="Digital Health Checker API",
-    description="Analyze and score the digital presence of any website",
-    version="2.1.0"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-# Test route for debugging
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
-
-# Root endpoint - serve frontend
-@app.get("/")
-def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
-
-# ── Security Headers Middleware ──
-
-@app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    return response
-
-# ── Rate Limiter ──
-
-login_attempts = {}
-
-def check_rate_limit(identifier: str):
-    now = time.time()
-    if identifier in login_attempts:
-        attempts = login_attempts[identifier]
-        attempts = [t for t in attempts if now - t < LOGIN_LOCKOUT_MINUTES * 60]
-        if len(attempts) >= MAX_LOGIN_ATTEMPTS:
-            retry_after = int(LOGIN_LOCKOUT_MINUTES * 60 - (now - attempts[0]))
-            raise HTTPException(
-                status_code=429,
-                detail=f"Too many login attempts. Try again in {max(1, retry_after // 60)} minutes."
-            )
-        login_attempts[identifier] = attempts
-    else:
-        login_attempts[identifier] = []
-
-def record_attempt(identifier: str):
-    if identifier not in login_attempts:
-        login_attempts[identifier] = []
-    login_attempts[identifier].append(time.time())
-    login_attempts[identifier] = [t for t in login_attempts[identifier] if time.time() - t < LOGIN_LOCKOUT_MINUTES * 60]
-
-
-# ── Input Sanitizer ──
-
 def sanitize_string(value: str, max_length: int = 100) -> str:
     if not value:
         return ""
     value = value.strip()
-    value = re.sub(r'<[^>]*>', '', value)  # strip HTML tags
-    value = re.sub(r'[<>"\'\\;{}()]', '', value)  # strip dangerous chars
-    value = value[:max_length]
-    return value
-
-
-# ── Data Models ──
+    value = re.sub(r'<[^>]*>', '', value)
+    value = re.sub(r'[<>"\'\\;{}()]', '', value)
+    return value[:max_length]
 
 class RegisterRequest(BaseModel):
     username: str
@@ -186,9 +98,6 @@ class BusinessRequest(BaseModel):
 class BatchRequest(BaseModel):
     businesses: List[BusinessRequest]
 
-
-# ── Password Hashing (PBKDF2 with salt) ──
-
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
     pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
@@ -202,9 +111,6 @@ def verify_password(password: str, stored: str) -> bool:
     except (ValueError, AttributeError):
         return False
 
-
-# ── Password Strength ──
-
 def check_password_strength(password: str) -> Optional[str]:
     if len(password) < 8:
         return "Password must be at least 8 characters"
@@ -215,9 +121,6 @@ def check_password_strength(password: str) -> Optional[str]:
     if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-]', password):
         return "Password must contain at least one special character"
     return None
-
-
-# ── User Storage ──
 
 def load_users():
     if not os.path.exists(USERS_FILE):
@@ -239,8 +142,6 @@ def load_users():
 def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
-
-# ── JWT ──
 
 def create_token(username, role):
     jti = secrets.token_hex(16)
@@ -272,25 +173,9 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Token expired or invalid. Please login again.")
     return payload
 
-# ── Root ──
-
 @app.get("/")
-def root():
-    return {
-        "app": "Digital Health Checker",
-        "version": "2.1.0",
-        "status": "running",
-        "endpoints": {
-            "register": "POST /auth/register",
-            "login": "POST /auth/login",
-            "me": "GET /auth/me",
-            "analyze": "POST /analyze (auth required)",
-            "admin_users": "GET /admin/users (admin only)",
-            "admin_searches": "GET /admin/searches (admin only)"
-        }
-    }
-
-# ── Auth Endpoints ──
+def serve_frontend():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
 
 @app.post("/auth/register")
 def register(req: RegisterRequest):
@@ -299,15 +184,12 @@ def register(req: RegisterRequest):
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
     if not re.match(r'^[a-zA-Z0-9_]+$', username):
         raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores")
-
     pwd_error = check_password_strength(req.password)
     if pwd_error:
         raise HTTPException(status_code=400, detail=pwd_error)
-
     users = load_users()
     if username in users:
         raise HTTPException(status_code=400, detail="Username already exists")
-
     users[username] = {
         "password": hash_password(req.password),
         "role": "user",
@@ -315,26 +197,20 @@ def register(req: RegisterRequest):
         "searches": []
     }
     save_users(users)
-
     token = create_token(username, "user")
     return {"success": True, "token": token, "username": username, "role": "user"}
 
 @app.post("/auth/login")
 def login(req: LoginRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
-
     check_rate_limit(client_ip)
-
     username = sanitize_string(req.username, 30)
     users = load_users()
     user = users.get(username)
-
     if not user or not verify_password(req.password, user["password"]):
         record_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Invalid username or password")
-
     login_attempts.pop(client_ip, None)
-
     token = create_token(username, user["role"])
     return {"success": True, "token": token, "username": username, "role": user["role"]}
 
@@ -342,23 +218,17 @@ def login(req: LoginRequest, request: Request):
 def me(current_user: dict = Depends(get_current_user)):
     return {"success": True, "username": current_user["username"], "role": current_user["role"]}
 
-
-# ── Analyze ──
-
 @app.post("/analyze")
-def analyze_business(request: BusinessRequest, authorization: str = Header(None)):
+def analyze_business_endpoint(request: BusinessRequest, authorization: str = Header(None)):
     try:
         current_user = get_current_user(authorization)
-
         name = sanitize_string(request.business_name, 80)
         url = sanitize_string(request.website_url, 200) if request.website_url else None
         if not name:
             raise HTTPException(status_code=400, detail="Business name is required")
-
         checker = DigitalHealthChecker(name, url)
         report = checker.run_all_checks()
         report["live_checks"] = True
-
         score = report["total_score"]
         if score >= 80:
             report["ai_summary"] = f"✨ {name} has a strong digital foundation!"
@@ -368,11 +238,9 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
             report["ai_summary"] = f"🔄 {name} has significant digital gaps that need attention."
         else:
             report["ai_summary"] = f"🚨 {name} is currently digitally invisible. Start with a Google Business Profile and social media pages today."
-
         has_website = bool(url)
         social_platforms = report.get("details", {}).get("social_media", {}).get("platforms_found", [])
         has_social = len(social_platforms) > 0
-
         recommendations = []
         if not has_website:
             recommendations.append({"priority": "Critical", "action": "Create a website (use platforms like Wix, WordPress, or Squarespace)", "impact": "Opens your business to 24/7 global discovery", "cost": "Free – $20/month"})
@@ -384,7 +252,6 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
             recommendations.append({"priority": "Medium", "action": "Address the issues listed below to improve your digital presence", "impact": "Improves customer trust and conversion rates", "cost": "Varies"})
         recommendations.append({"priority": "Maintenance", "action": "Ask satisfied customers to leave reviews on Google and social media", "impact": "Builds social proof and improves search ranking", "cost": "Free"})
         report["recommendations"] = recommendations
-
         roadmap = []
         if not has_website or report.get("issues"):
             roadmap.append({"week": 1, "task": "Create/improve website", "effort": "2-3 hours"})
@@ -395,8 +262,6 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
         roadmap.append({"week": 3, "task": "Collect reviews from existing customers", "effort": "1 hour"})
         roadmap.append({"week": 4, "task": "Review progress and re-check digital health score", "effort": "30 min"})
         report["roadmap"] = roadmap
-
-        # Track search
         users = load_users()
         if current_user["username"] in users:
             search_entry = {
@@ -407,7 +272,6 @@ def analyze_business(request: BusinessRequest, authorization: str = Header(None)
             }
             users[current_user["username"]]["searches"].append(search_entry)
             save_users(users)
-
         return {"success": True, "data": report}
     except HTTPException:
         raise
@@ -425,7 +289,7 @@ def analyze_batch(request: BatchRequest, authorization: str = Header(None)):
             checker = DigitalHealthChecker(name, url)
             report = checker.run_all_checks()
             results.append({"business": name, "success": True, "data": report})
-        except Exception as e:
+        except Exception:
             results.append({"business": biz.business_name, "success": False, "error": "Processing failed"})
     return {"success": True, "results": results}
 
@@ -451,19 +315,13 @@ def quick_website_check(url: str):
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "healthy",
-        "api_version": "2.1.0"
-    }
-
-# ── Admin Endpoints ──
+    return {"status": "healthy", "api_version": "2.1.0"}
 
 @app.get("/admin/users")
 def admin_users(authorization: str = Header(None)):
     current_user = get_current_user(authorization)
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-
     users = load_users()
     safe = {}
     for uname, data in users.items():
@@ -479,7 +337,6 @@ def admin_searches(authorization: str = Header(None)):
     current_user = get_current_user(authorization)
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-
     users = load_users()
     all_searches = []
     for uname, data in users.items():
@@ -490,20 +347,6 @@ def admin_searches(authorization: str = Header(None)):
     all_searches.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return {"success": True, "searches": all_searches}
 
-# Root endpoint - serve frontend
-@app.get("/")
-def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), media_type="text/html")
-
-# Static files (JS, CSS, images) - must be mounted BEFORE catch-all routes
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-
-# Test route for debugging
-@app.get("/test-route")
-def test_route():
-    return {"message": "Test route works", "timestamp": datetime.datetime.utcnow().isoformat()}
-
-# Debug endpoint to list all routes
 @app.get("/debug/routes")
 def debug_routes():
     routes = []
@@ -512,10 +355,7 @@ def debug_routes():
             routes.append({"path": route.path, "methods": list(route.methods) if hasattr(route, 'methods') else []})
     return {"routes": routes}
 
-# Debug endpoint
-@app.get("/debug/simple")
-def debug_simple():
-    return {"success": True, "message": "Debug endpoint works"}
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 if __name__ == "__main__":
     import uvicorn
