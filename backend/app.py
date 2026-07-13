@@ -358,6 +358,16 @@ def debug_routes():
             routes.append({"path": route.path, "methods": list(route.methods) if hasattr(route, 'methods') else []})
     return {"routes": routes}
 
+@app.get("/debug/test-analyze")
+def debug_test_analyze():
+    try:
+        checker = DigitalHealthChecker("Test Business")
+        report = checker.run_all_checks()
+        return {"success": True, "report": report}
+    except Exception as e:
+        import traceback
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 if __name__ == "__main__":
